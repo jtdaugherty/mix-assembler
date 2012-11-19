@@ -17,7 +17,7 @@ mixalParser = many1 p
         s <- choice $ try <$> [ parseDirective
                               , parseInstruction
                               ]
-        _ <- try $ char '\n'
+        (char '\n' >> return ()) <|> eof
         return s
 
 parseDirective :: Parser S.MIXALStmt

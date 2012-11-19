@@ -2,8 +2,8 @@ X       EQU     10000
 X       EQU     -5
 Y       EQU     1+2+3
         LDA     1000
-LAB     LDA     1000
-        LDA     1000,2(3:4)
+LAB     LDA     2000
+        LDA     3000,2(3:4)
         LDA     OP2,1
 2H      LDA     2B
 ORIG    2000
