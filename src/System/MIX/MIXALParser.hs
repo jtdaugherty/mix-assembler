@@ -44,9 +44,7 @@ parseInstNoLabel = do
   spaces
   a <- (Just <$> parseAddress) <|> (return Nothing)
   let parseIndex = S.Index <$> (char ',' >> parseInt)
-      parseField = do
-        e <- parens parseExpr
-        return $ S.FieldExpr e
+      parseField = S.FieldExpr <$> parens parseExpr
   i <- (Just <$> parseIndex) <|> (return Nothing)
   f <- (Just <$> parseField) <|> (return Nothing)
   return $ S.Inst Nothing op a i f
@@ -59,9 +57,7 @@ parseInstWithLabel = do
   spaces
   a <- (Just <$> parseAddress) <|> (return Nothing)
   let parseIndex = S.Index <$> (char ',' >> parseInt)
-      parseField = do
-        e <- parens parseExpr
-        return $ S.FieldExpr e
+      parseField = S.FieldExpr <$> parens parseExpr
   i <- (Just <$> parseIndex) <|> (return Nothing)
   f <- (Just <$> parseField) <|> (return Nothing)
   return $ S.Inst (Just s) op a i f
