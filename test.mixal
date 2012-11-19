@@ -1,0 +1,4 @@
+X       EQU     10000
+X       EQU     -5
+Y       EQU     1+2+3
+ORIG    2000

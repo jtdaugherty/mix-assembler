@@ -1,0 +1,33 @@
+Name:                mix-assembly
+Version:             0.1
+Synopsis:            Haskell implementation of the MIX assembly language
+License:             BSD3
+License-file:        LICENSE
+Author:              Jonathan Daugherty <jtd@galois.com>
+Maintainer:          Jonathan Daugherty <jtd@galois.com>
+Copyright:           Jonathan Daugherty, 2012
+Category:            System
+Build-Type:          Simple
+Cabal-Version:       >=1.8
+
+Library
+  Hs-source-dirs:    src
+
+  Exposed-modules:
+    System.MIX.Symbolic
+    System.MIX.MIXALParser
+    System.MIX.PP
+
+  Build-depends:
+    base >= 4,
+    parsec,
+    pretty
+
+Executable mixal
+  Hs-Source-Dirs:    src
+  Main-is:           Main.hs
+  GHC-Options:       -Wall
+  Build-Depends:
+    base,
+    parsec,
+    pretty
