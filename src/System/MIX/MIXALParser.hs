@@ -23,6 +23,7 @@ mixalParser = many1 p
 parseDirective :: Parser S.MIXALStmt
 parseDirective = choice $ try <$> [ parseEqu
                                   , parseOrig
+                                  , parseEnd
                                   ]
 
 parseInstruction :: Parser S.MIXALStmt
@@ -140,6 +141,14 @@ parseEqu = do
   spaces
   e <- parseExpr
   return $ S.Dir $ S.EQU s e
+
+parseEnd :: Parser S.MIXALStmt
+parseEnd = do
+  spaces
+  _ <- string "END"
+  spaces
+  e <- parseExpr
+  return $ S.Dir $ S.END e
 
 parseOrig :: Parser S.MIXALStmt
 parseOrig = do

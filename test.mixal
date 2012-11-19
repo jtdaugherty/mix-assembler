@@ -7,3 +7,4 @@ LAB     LDA     2000
         LDA     OP2,1
 2H      LDA     2B
 ORIG    2000
+END     5

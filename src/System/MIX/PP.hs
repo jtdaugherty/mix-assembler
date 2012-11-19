@@ -64,6 +64,7 @@ ppSymbol (Symbol s) = text s
 ppDirective :: Directive -> Doc
 ppDirective (ORIG i) = text "" $$ (nest 11 (text "ORIG" $$ (nest 5 $ ppExpr i)))
 ppDirective (EQU s i) = ppSymbolDef s $$ nest 11 (text "EQU" $$ (nest 5 $ ppExpr i))
+ppDirective (END e) = text "" $$ (nest 11 (text "END" $$ (nest 5 $ ppExpr e)))
 
 ppMIXALStmt :: MIXALStmt -> Doc
 ppMIXALStmt (Dir d) = ppDirective d

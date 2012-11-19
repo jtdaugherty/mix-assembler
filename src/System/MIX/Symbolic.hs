@@ -53,6 +53,7 @@ data BinOp = Add
 data Directive
     = ORIG Expr
     | EQU DefinedSymbol Expr
+    | END Expr
       deriving (Eq, Show)
 
 data OpCode
