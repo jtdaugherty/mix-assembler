@@ -67,10 +67,14 @@ mppSymbolDef Nothing = empty
 mppSymbolDef (Just s) = ppSymbolDef s
 
 ppMIXALStmt :: MIXALStmt -> Doc
-ppMIXALStmt (Orig s wv) = mppSymbolDef s $$ (nest 11 (text "ORIG" $$ (nest 5 $ ppWValue wv)))
-ppMIXALStmt (Equ s wv) = mppSymbolDef s $$ nest 11 (text "EQU" $$ (nest 5 $ ppWValue wv))
-ppMIXALStmt (Con s wv) = mppSymbolDef s $$ nest 11 (text "CON" $$ (nest 5 $ ppWValue wv))
-ppMIXALStmt (End s wv) = mppSymbolDef s $$ (nest 11 (text "END" $$ (nest 5 $ ppWValue wv)))
+ppMIXALStmt (Orig s wv) =
+    mppSymbolDef s $$ (nest 11 (text "ORIG" $$ (nest 5 $ ppWValue wv)))
+ppMIXALStmt (Equ s wv) =
+    mppSymbolDef s $$ nest 11 (text "EQU" $$ (nest 5 $ ppWValue wv))
+ppMIXALStmt (Con s wv) =
+    mppSymbolDef s $$ nest 11 (text "CON" $$ (nest 5 $ ppWValue wv))
+ppMIXALStmt (End s wv) =
+    mppSymbolDef s $$ (nest 11 (text "END" $$ (nest 5 $ ppWValue wv)))
 ppMIXALStmt (Alf s (c1, c2, c3, c4, c5)) =
     mppSymbolDef s $$ (nest 11 (text "ALF" $$ (nest 5 $ doubleQuotes (text $ c1:c2:c3:c4:c5:[]))))
 ppMIXALStmt (Inst s o addr i f) =
