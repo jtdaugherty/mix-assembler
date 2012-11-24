@@ -5,31 +5,42 @@ where
 
 import qualified System.MIX.Symbolic as S
 import Control.Applicative ((<$>))
+import Control.Monad (replicateM)
 import Text.ParserCombinators.Parsec
 
 parseMIXAL :: String -> String -> Either ParseError [S.MIXALStmt]
 parseMIXAL filename doc = parse mixalParser filename doc
 
 mixalParser :: Parser [S.MIXALStmt]
-mixalParser = many1 p
+mixalParser = do
+  many1 p
     where
       p = do
-        s <- choice $ try <$> [ parseDirective
-                              , parseInstruction
-                              ]
+        s <- parseStmt
         (char '\n' >> return ()) <|> eof
         return s
 
-parseDirective :: Parser S.MIXALStmt
-parseDirective = choice $ try <$> [ parseEqu
-                                  , parseOrig
-                                  , parseEnd
-                                  ]
+parseStmt :: Parser S.MIXALStmt
+parseStmt = choice (try <$> choices)
+    where
+      choices = concat [ withoutLabel <$> stmts
+                       , withLabel <$> stmts
+                       ]
 
-parseInstruction :: Parser S.MIXALStmt
-parseInstruction = choice $ try <$> [ parseInstNoLabel
-                                    , parseInstWithLabel
-                                    ]
+      withoutLabel p = spaces >> p Nothing
+
+      withLabel p = do
+        s <- parseDefinedSymbol
+        _ <- many1 space
+        p $ Just s
+
+      stmts = [ parseEqu
+              , parseOrig
+              , parseEnd
+              , parseCon
+              , parseAlf
+              , parseInst
+              ]
 
 parens :: Parser a -> Parser a
 parens p = do
@@ -37,31 +48,6 @@ parens p = do
   v <- p
   _ <- char ')'
   return v
-
-parseInstNoLabel :: Parser S.MIXALStmt
-parseInstNoLabel = do
-  spaces
-  op <- parseOpCode
-  spaces
-  a <- (Just <$> parseAddress) <|> (return Nothing)
-  let parseIndex = S.Index <$> (char ',' >> parseInt)
-      parseField = S.FieldExpr <$> parens parseExpr
-  i <- (Just <$> parseIndex) <|> (return Nothing)
-  f <- (Just <$> parseField) <|> (return Nothing)
-  return $ S.Inst Nothing op a i f
-
-parseInstWithLabel :: Parser S.MIXALStmt
-parseInstWithLabel = do
-  s <- parseDefinedSymbol
-  spaces
-  op <- parseOpCode
-  spaces
-  a <- (Just <$> parseAddress) <|> (return Nothing)
-  let parseIndex = S.Index <$> (char ',' >> parseInt)
-      parseField = S.FieldExpr <$> parens parseExpr
-  i <- (Just <$> parseIndex) <|> (return Nothing)
-  f <- (Just <$> parseField) <|> (return Nothing)
-  return $ S.Inst (Just s) op a i f
 
 parseAddress :: Parser S.Address
 parseAddress =
@@ -74,10 +60,17 @@ parseWValue :: Parser S.WValue
 parseWValue = do
   let p = do
         e <- parseExpr
-        f <- S.FieldExpr <$> parens parseExpr
+        f <- choice [ Just <$> S.FieldExpr <$> (try $ parens parseExpr)
+                    , return Nothing
+                    ]
         return (e, f)
 
-  S.WValue <$> sepBy1 p (char ',')
+      pairs = sepBy1 p (char ',')
+      mkWValue [] = error "This case should be impossible due to sepBy1 failing"
+      mkWValue [(e, f)] = S.One e f
+      mkWValue ((e, f):ps) = S.Many e f $ mkWValue ps
+
+  mkWValue <$> pairs
 
 parseOpCode :: Parser S.OpCode
 parseOpCode =
@@ -133,33 +126,67 @@ parseOpCode =
                   , ("MOVE", S.MOVE), ("NOP", S.NOP), ("HLT", S.HLT)
                   ]
 
-parseEqu :: Parser S.MIXALStmt
-parseEqu = do
-  s <- parseDefinedSymbol
-  spaces
+-- These parsers are intended to be combined with a parser that will
+-- try to parse them, or, failing that, parse first a defined symbol,
+-- spaces, and then this parser.
+parseInst :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
+parseInst s = do
+  op <- parseOpCode
+  _ <- many1 space
+  a <- (Just <$> parseAddress) <|> (return Nothing)
+  let parseIndex = S.Index <$> (char ',' >> parseInt)
+      parseField = S.FieldExpr <$> parens parseExpr
+  i <- (Just <$> parseIndex) <|> (return Nothing)
+  f <- (Just <$> parseField) <|> (return Nothing)
+  return $ S.Inst s op a i f
+
+parseEqu :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
+parseEqu s = do
   _ <- string "EQU"
-  spaces
-  e <- parseExpr
-  return $ S.Dir $ S.EQU s e
+  _ <- many1 space
+  w <- parseWValue
+  return $ S.Equ s w
 
-parseEnd :: Parser S.MIXALStmt
-parseEnd = do
-  spaces
+parseEnd :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
+parseEnd s = do
   _ <- string "END"
-  spaces
-  e <- parseExpr
-  return $ S.Dir $ S.END e
+  _ <- many1 space
+  w <- parseWValue
+  return $ S.End s w
 
-parseOrig :: Parser S.MIXALStmt
-parseOrig = do
-  spaces
+parseOrig :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
+parseOrig s = do
   _ <- string "ORIG"
-  spaces
-  e <- parseExpr
-  return $ S.Dir $ S.ORIG e
+  _ <- many1 space
+  w <- parseWValue
+  return $ S.Orig s w
+
+parseCon :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
+parseCon s = do
+  _ <- string "CON"
+  _ <- many1 space
+  w <- parseWValue
+  return $ S.Con s w
+
+parseAlf :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
+parseAlf s = do
+  _ <- string "ALF"
+  _ <- many1 space
+  -- XXX MIXAL doesn't use quotes but we use them to parse the chars
+  -- in ALF because we don't enforce the number of spaces between the
+  -- OP and the ADDRESS components of a line.
+  _ <- char '"'
+  chs <- replicateM 5 anyChar
+  _ <- char '"'
+  let cs = (chs !! 0, chs !! 1, chs !! 2, chs !! 3, chs !! 4)
+  return $ S.Alf s cs
 
 parseExpr :: Parser S.Expr
 parseExpr =
+    -- Note: BinOps must come first to encourage the parser to try
+    -- parsing a maximal expression first.  If we try atomic or signed
+    -- expressions first, we'll only parse the first token in an
+    -- expression and leave the rest to confuse subsequent parsers.
     choice $ try <$> [ parseBinOpExpr
                      , S.AtExpr <$> parseAtomicExpr
                      , parseSignedExpr
@@ -167,10 +194,17 @@ parseExpr =
 
 parseBinOpExpr :: Parser S.Expr
 parseBinOpExpr = do
-  e1 <- parseAtomicExpr
-  op <- parseBinOp
-  e2 <- parseExpr
-  return $ S.BinOp op e2 e1
+  e1 <- choice [ S.AtExpr <$> parseAtomicExpr
+               , parseSignedExpr
+               ]
+  rest <- many1 $ do
+            op <- parseBinOp
+            e <- choice [ S.AtExpr <$> parseAtomicExpr
+                        , parseSignedExpr
+                        ]
+            return (op, e)
+
+  return $ S.BinOp e1 rest
 
 parseBinOp :: Parser S.BinOp
 parseBinOp =
@@ -191,10 +225,10 @@ parseSignedExpr = do
 
 parseAtomicExpr :: Parser S.AtomicExpr
 parseAtomicExpr =
-    choice [ S.Num <$> parseInt
-           , S.Sym <$> parseSymbolRef
-           , char '*' >> return S.Asterisk
-           ]
+    choice $ try <$> [ S.Num <$> parseInt
+                     , S.Sym <$> parseSymbolRef
+                     , char '*' >> return S.Asterisk
+                     ]
 
 parseInt :: Parser Int
 parseInt = parseNeg <|> parsePos

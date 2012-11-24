@@ -12,6 +12,7 @@ Cabal-Version:       >=1.8
 
 Library
   Hs-source-dirs:    src
+  GHC-Options:       -Wall
 
   Exposed-modules:
     System.MIX.Symbolic

@@ -5,8 +5,12 @@ module System.MIX.Symbolic where
 -- constants, assembler directives (ORIG, CON, etc.).
 
 data MIXALStmt
-    = Dir Directive
+    = Orig (Maybe DefinedSymbol) WValue
+    | Equ (Maybe DefinedSymbol) WValue
+    | Con (Maybe DefinedSymbol) WValue
+    | Alf (Maybe DefinedSymbol) (Char, Char, Char, Char, Char)
     | Inst (Maybe DefinedSymbol) OpCode (Maybe Address) (Maybe Index) (Maybe Field)
+    | End (Maybe DefinedSymbol) WValue
       deriving (Eq, Show)
 
 data Address = AddrExpr Expr
@@ -23,7 +27,8 @@ data SymbolRef = RefNormal Symbol
                | RefForward Int
                  deriving (Eq, Show)
 
-data WValue = WValue [(Expr, Field)]
+data WValue = One Expr (Maybe Field)
+            | Many Expr (Maybe Field) WValue
               deriving (Eq, Show)
 
 newtype Index = Index Int
@@ -39,7 +44,7 @@ data AtomicExpr = Num Int
 
 data Expr = AtExpr AtomicExpr
           | Signed Bool AtomicExpr
-          | BinOp BinOp Expr AtomicExpr
+          | BinOp Expr [(BinOp, Expr)]
             deriving (Eq, Show)
 
 data BinOp = Add
@@ -49,12 +54,6 @@ data BinOp = Add
            | Frac
            | Field
              deriving (Eq, Show)
-
-data Directive
-    = ORIG Expr
-    | EQU DefinedSymbol Expr
-    | END Expr
-      deriving (Eq, Show)
 
 data OpCode
     = LDA | LDX | LD1 | LD2 | LD3 | LD4 | LD5 | LD6

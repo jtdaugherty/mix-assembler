@@ -1,21 +1,22 @@
 module System.MIX.PP where
 
+import Control.Applicative ((<$>))
 import Text.PrettyPrint.HughesPJ
 import System.MIX.Symbolic
 import Data.Maybe (isJust, fromJust)
-import Data.List (intersperse)
-import Control.Applicative ((<$>))
 
 ppAddress :: Address -> Doc
 ppAddress (AddrExpr e) = ppExpr e
 ppAddress (AddrRef s) = ppSymbolRef s
 ppAddress (AddrLiteral v) = text "=" <> ppWValue v <> text "="
 
+mppField :: Maybe Field -> Doc
+mppField Nothing = empty
+mppField (Just f) = text "(" <> ppField f <> text ")"
+
 ppWValue :: WValue -> Doc
-ppWValue (WValue pairs) =
-    hcat $ intersperse (text ",") $ showPair <$> pairs
-        where
-          showPair (e, f) = ppExpr e <> text "(" <> ppField f <> text ")"
+ppWValue (One e f) = ppExpr e <> mppField f
+ppWValue (Many e f wv) = ppWValue (One e f) <> text "," <> ppWValue wv
 
 ppIndex :: Index -> Doc
 ppIndex (Index i) = text $ show i
@@ -39,10 +40,10 @@ ppExpr (AtExpr a) = ppAtomicExpr a
 ppExpr (Signed s e) = text sign <> ppAtomicExpr e
     where
       sign = if s then "+" else "-"
-ppExpr (BinOp op a1 a2) = hcat [ ppExpr a1
-                               , ppBinOp op
-                               , ppAtomicExpr a2
-                               ]
+ppExpr (BinOp e1 rest) = hcat $ ppExpr e1 : restDocs
+    where
+      restDocs = pairDoc <$> rest
+      pairDoc (op, e) = ppBinOp op <> ppExpr e
 
 ppAtomicExpr :: AtomicExpr -> Doc
 ppAtomicExpr (Num i) = text $ show i
@@ -61,13 +62,17 @@ ppSymbolRef (RefForward i) = text $ (show i) ++ "F"
 ppSymbol :: Symbol -> Doc
 ppSymbol (Symbol s) = text s
 
-ppDirective :: Directive -> Doc
-ppDirective (ORIG i) = text "" $$ (nest 11 (text "ORIG" $$ (nest 5 $ ppExpr i)))
-ppDirective (EQU s i) = ppSymbolDef s $$ nest 11 (text "EQU" $$ (nest 5 $ ppExpr i))
-ppDirective (END e) = text "" $$ (nest 11 (text "END" $$ (nest 5 $ ppExpr e)))
+mppSymbolDef :: Maybe DefinedSymbol -> Doc
+mppSymbolDef Nothing = empty
+mppSymbolDef (Just s) = ppSymbolDef s
 
 ppMIXALStmt :: MIXALStmt -> Doc
-ppMIXALStmt (Dir d) = ppDirective d
+ppMIXALStmt (Orig s wv) = mppSymbolDef s $$ (nest 11 (text "ORIG" $$ (nest 5 $ ppWValue wv)))
+ppMIXALStmt (Equ s wv) = mppSymbolDef s $$ nest 11 (text "EQU" $$ (nest 5 $ ppWValue wv))
+ppMIXALStmt (Con s wv) = mppSymbolDef s $$ nest 11 (text "CON" $$ (nest 5 $ ppWValue wv))
+ppMIXALStmt (End s wv) = mppSymbolDef s $$ (nest 11 (text "END" $$ (nest 5 $ ppWValue wv)))
+ppMIXALStmt (Alf s (c1, c2, c3, c4, c5)) =
+    mppSymbolDef s $$ (nest 11 (text "ALF" $$ (nest 5 $ doubleQuotes (text $ c1:c2:c3:c4:c5:[]))))
 ppMIXALStmt (Inst s o addr i f) =
     showSym $$ nest 11 (ppOpCode o $$ (nest 5 (ppA <> sep1 <> ppI <> ppF f)))
         where
