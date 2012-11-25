@@ -18,10 +18,14 @@ Library
     System.MIX.Symbolic
     System.MIX.MIXALParser
     System.MIX.PP
+    System.MIX.Assembler
+    System.MIX.Char
+    System.MIX.OpCode
 
   Build-depends:
     base >= 4,
     parsec,
+    mtl,
     pretty
 
 Executable mixal
@@ -31,4 +35,5 @@ Executable mixal
   Build-Depends:
     base,
     parsec,
+    mtl,
     pretty

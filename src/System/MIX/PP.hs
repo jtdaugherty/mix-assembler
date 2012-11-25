@@ -1,6 +1,7 @@
 module System.MIX.PP where
 
 import Control.Applicative ((<$>))
+import Data.List (intersperse)
 import Text.PrettyPrint.HughesPJ
 import System.MIX.Symbolic
 import Data.Maybe (isJust, fromJust)
@@ -15,8 +16,11 @@ mppField Nothing = empty
 mppField (Just f) = text "(" <> ppField f <> text ")"
 
 ppWValue :: WValue -> Doc
-ppWValue (One e f) = ppExpr e <> mppField f
-ppWValue (Many e f wv) = ppWValue (One e f) <> text "," <> ppWValue wv
+ppWValue (WValue e f rest) =
+    hcat $ addCommas $ doc <$> (e, f) : rest
+        where
+          doc (ex, fld) = ppExpr ex <> mppField fld
+          addCommas = intersperse (text ",")
 
 ppIndex :: Index -> Doc
 ppIndex (Index i) = text $ show i
@@ -75,7 +79,7 @@ ppMIXALStmt (Con s wv) =
     mppSymbolDef s $$ nest 11 (text "CON" $$ (nest 5 $ ppWValue wv))
 ppMIXALStmt (End s wv) =
     mppSymbolDef s $$ (nest 11 (text "END" $$ (nest 5 $ ppWValue wv)))
-ppMIXALStmt (Alf s (c1, c2, c3, c4, c5)) =
+ppMIXALStmt (Alf s (MIXChar c1, MIXChar c2, MIXChar c3, MIXChar c4, MIXChar c5)) =
     mppSymbolDef s $$ (nest 11 (text "ALF" $$ (nest 5 $ doubleQuotes (text $ c1:c2:c3:c4:c5:[]))))
 ppMIXALStmt (Inst s o addr i f) =
     showSym $$ nest 11 (ppOpCode o $$ (nest 5 (ppA <> sep1 <> ppI <> ppF f)))

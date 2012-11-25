@@ -4,6 +4,7 @@ module System.MIX.MIXALParser
 where
 
 import qualified System.MIX.Symbolic as S
+import System.MIX.Char (chars)
 import Control.Applicative ((<$>))
 import Control.Monad (replicateM)
 import Text.ParserCombinators.Parsec
@@ -67,8 +68,7 @@ parseWValue = do
 
       pairs = sepBy1 p (char ',')
       mkWValue [] = error "This case should be impossible due to sepBy1 failing"
-      mkWValue [(e, f)] = S.One e f
-      mkWValue ((e, f):ps) = S.Many e f $ mkWValue ps
+      mkWValue ((e, f):ps) = S.WValue e f ps
 
   mkWValue <$> pairs
 
@@ -168,6 +168,9 @@ parseCon s = do
   w <- parseWValue
   return $ S.Con s w
 
+mixChar :: Parser S.MIXChar
+mixChar = S.MIXChar <$> oneOf chars
+
 parseAlf :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
 parseAlf s = do
   _ <- string "ALF"
@@ -176,9 +179,14 @@ parseAlf s = do
   -- in ALF because we don't enforce the number of spaces between the
   -- OP and the ADDRESS components of a line.
   _ <- char '"'
-  chs <- replicateM 5 anyChar
+  chs <- replicateM 5 mixChar
   _ <- char '"'
-  let cs = (chs !! 0, chs !! 1, chs !! 2, chs !! 3, chs !! 4)
+  let cs = ( chs !! 0
+           , chs !! 1
+           , chs !! 2
+           , chs !! 3
+           , chs !! 4
+           )
   return $ S.Alf s cs
 
 parseExpr :: Parser S.Expr

@@ -1,11 +1,13 @@
 module Main where
 
 import System.Environment (getArgs)
+import Control.Monad (forM_)
 import Text.PrettyPrint.HughesPJ
 import Control.Applicative
 
 import System.MIX.MIXALParser
 import System.MIX.PP
+import System.MIX.Assembler
 
 main :: IO ()
 main = do
@@ -24,3 +26,9 @@ main = do
            mapM_ (putStrLn . show) is
            putStrLn ""
            putStrLn $ render $ vcat $ ppMIXALStmt <$> is
+
+           let result = assemble is
+           putStrLn "Assembler output:"
+
+           forM_ result $ \(pc, w) ->
+               putStrLn $ (show pc) ++ "     " ++ (show w)

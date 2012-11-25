@@ -4,11 +4,14 @@ module System.MIX.Symbolic where
 -- names for instruction locations, symbolic references, literal
 -- constants, assembler directives (ORIG, CON, etc.).
 
+newtype MIXChar = MIXChar Char
+    deriving (Eq, Show)
+
 data MIXALStmt
     = Orig (Maybe DefinedSymbol) WValue
     | Equ (Maybe DefinedSymbol) WValue
     | Con (Maybe DefinedSymbol) WValue
-    | Alf (Maybe DefinedSymbol) (Char, Char, Char, Char, Char)
+    | Alf (Maybe DefinedSymbol) (MIXChar, MIXChar, MIXChar, MIXChar, MIXChar)
     | Inst (Maybe DefinedSymbol) OpCode (Maybe Address) (Maybe Index) (Maybe Field)
     | End (Maybe DefinedSymbol) WValue
       deriving (Eq, Show)
@@ -27,8 +30,7 @@ data SymbolRef = RefNormal Symbol
                | RefForward Int
                  deriving (Eq, Show)
 
-data WValue = One Expr (Maybe Field)
-            | Many Expr (Maybe Field) WValue
+data WValue = WValue Expr (Maybe Field) [(Expr, Maybe Field)]
               deriving (Eq, Show)
 
 newtype Index = Index Int

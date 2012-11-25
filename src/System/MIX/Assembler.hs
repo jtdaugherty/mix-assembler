@@ -1,0 +1,219 @@
+module System.MIX.Assembler
+    ( assemble
+    )
+where
+
+import Control.Applicative ((<$>))
+import Control.Monad.State
+import Data.Bits
+import Data.Int (Int32)
+import Data.Char (intToDigit)
+import Numeric (showIntAtBase, showHex)
+import qualified System.MIX.Symbolic as S
+import System.MIX.Char (charToByte)
+import System.MIX.OpCode
+
+import Debug.Trace
+
+data MIXWord = MW Bool Int
+               deriving (Eq)
+
+instance Show MIXWord where
+    show (MW s v) = concat [ "[ "
+                           , sgn
+                           , " "
+                           , showHex (getByte 1 v) " "
+                           , showHex (getByte 2 v) " "
+                           , showHex (getByte 3 v) " "
+                           , showHex (getByte 4 v) " "
+                           , showHex (getByte 5 v) ""
+                           , " ("
+                           , showBinary v
+                           , ") ]"
+                           ]
+        where
+          sgn = if s then "-" else "+"
+
+showBinary :: Int -> String
+showBinary v = showIntAtBase 2 intToDigit (abs v) ""
+
+data AssemblerState =
+    AS { equivalents :: [(S.DefinedSymbol, Int)]
+       -- ^Includes symbols defined with EQU as well as symbols
+       -- associated with program counter values.
+       , programCounter :: Int
+       , output :: [(Int, MIXWord)]
+       }
+
+type M a = State AssemblerState a
+
+byteMask :: Int
+byteMask = 0x3F -- 111111
+
+getByte :: Int -> Int -> Int
+getByte num i =
+    -- Right-shift the byte of interest down to the first 6 bits and
+    -- then mask it
+    shiftR i ((bytesPerWord - num) * bitsPerByte) .&. byteMask
+
+bitsPerByte :: Int
+bitsPerByte = 6
+
+bytesPerWord :: Int
+bytesPerWord = 5
+
+initialState :: AssemblerState
+initialState = AS [] 0 []
+
+getPc :: M Int
+getPc = programCounter <$> get
+
+incPc :: M ()
+incPc =
+    modify (\s -> s { programCounter = programCounter s + 1 })
+
+setPc :: Int -> M ()
+setPc i =
+    modify (\s -> s { programCounter = i })
+
+append :: MIXWord -> Int -> M ()
+append inst pc =
+    modify (\s -> s { output = output s ++ [(pc, inst)] })
+
+assemble :: [S.MIXALStmt] -> [(Int, MIXWord)]
+assemble ss =
+    output $ execState (doAssembly ss) initialState
+
+doAssembly :: [S.MIXALStmt] -> M ()
+doAssembly [] = return ()
+doAssembly (s:ss) = assembleStatement s >> doAssembly ss
+
+registerSym :: Maybe S.DefinedSymbol -> Int -> M ()
+registerSym Nothing _ = return ()
+registerSym (Just sym) i =
+  modify $ \s ->
+      s { equivalents = equivalents s ++ [(sym, i)]
+        }
+
+evalExpr :: S.Expr -> M Int
+evalExpr (S.AtExpr ae) = evalAtomicExpr ae
+evalExpr (S.Signed s ae) = do
+  val <- evalAtomicExpr ae
+  let sVal = if s then 1 else -1
+  return $ val * sVal
+evalExpr (S.BinOp _ []) = error "Invalid, should be prevented by parser"
+evalExpr (S.BinOp e1 rest) = do
+  e1val <- evalExpr e1
+
+  let next prev (op, e) = do
+        e2val <- evalExpr e
+        return $ evalBinOp op prev e2val
+
+  foldM next e1val rest
+
+resolveSymbol :: S.SymbolRef -> M Int
+resolveSymbol (S.RefNormal s) = do
+  st <- get
+  let result = lookup (S.DefNormal s) $ equivalents st
+  case result of
+    Nothing -> error $ "No such symbol: " ++ show s
+    Just v -> return v
+resolveSymbol (S.RefBackward _) = undefined
+resolveSymbol (S.RefForward _) = undefined
+
+evalAtomicExpr :: S.AtomicExpr -> M Int
+evalAtomicExpr (S.Num i) = return i
+evalAtomicExpr (S.Sym s) = resolveSymbol s
+evalAtomicExpr S.Asterisk = programCounter <$> get
+
+evalBinOp :: S.BinOp -> Int -> Int -> Int
+evalBinOp S.Add = (+)
+evalBinOp S.Subtract = (-)
+evalBinOp S.Multiply = (*)
+evalBinOp S.Divide = div
+evalBinOp S.Frac = undefined
+evalBinOp S.Field = \a b -> a * 8 + b
+
+storeInField' :: Maybe Int -> (Int, Int) -> Int -> M Int
+storeInField' Nothing _ v = return v
+storeInField' (Just s) (left, right) d = do
+  let shiftAmt = (bytesPerWord - right) * bitsPerByte
+      sval = shiftL s shiftAmt
+      final = sval .|. (clearBytes [left..right] d)
+
+  trace ("Storing " ++ showBinary s ++ " in field (" ++ show left ++ ", " ++ show right ++ ") of " ++ showBinary d ++ " (shifted " ++ show shiftAmt ++ " bits); sval is " ++ showBinary sval ++ ", final is " ++ showBinary final) return ()
+
+  return final
+
+storeInField :: Int -> Maybe S.Field -> Int -> M Int
+storeInField s Nothing _ = return s
+storeInField s (Just (S.FieldExpr f)) d = do
+  fval <- evalExpr f
+  let right = fval `mod` 8
+      left = (fval - right) `div` 8
+  storeInField' (Just s) (left, right) d
+
+clearBytes :: (Bits a) => [Int] -> a -> a
+clearBytes [] = id
+clearBytes (i:is) = clearByte i . clearBytes is
+
+-- byte 0: bits 30-31
+-- byte 1: bits 24-29
+-- byte 2: bits 18-23
+-- byte 3: bits 12-17
+-- byte 4: bits 6-11
+-- byte 5: bits 0-5
+clearByte :: (Bits a) => Int -> a -> a
+clearByte i val =
+    let base = (bytesPerWord - i) * bitsPerByte
+    in foldr (flip clearBit) val [base..base+bitsPerByte-1]
+
+evalWValue :: S.WValue -> M Int
+evalWValue (S.WValue e mf rest) = do
+  -- Store the leftmost wvalue.
+  val <- evalExpr e
+  initial <- storeInField val mf 0
+
+  let next dest (ex, f) = do
+        v <- evalExpr ex
+        storeInField v f dest
+
+  foldM next initial rest
+
+assembleStatement :: S.MIXALStmt -> M ()
+assembleStatement (S.Orig ms wv) = do
+  registerSym ms =<< getPc
+  evalWValue wv >>= setPc
+assembleStatement (S.Equ ms wv) = do
+  val <- evalWValue wv
+  registerSym ms val
+assembleStatement (S.Con ms wv) = do
+  val <- evalWValue wv
+  pc <- getPc
+  -- XXX storeStmt; need types to represent statements after
+  -- processing (i.e. abstract assembled statements)
+  registerSym ms pc
+  incPc
+assembleStatement (S.Alf ms (c1, c2, c3, c4, c5)) = do
+  val <- storeInField' (Just $ charToByte c1) (1, 1) =<<
+         storeInField' (Just $ charToByte c2) (2, 2) =<<
+         storeInField' (Just $ charToByte c3) (3, 3) =<<
+         storeInField' (Just $ charToByte c4) (4, 4) =<<
+         storeInField' (Just $ charToByte c5) (5, 5) 0
+  registerSym ms =<< getPc
+  -- Store the instruction.
+  append (MW False val) =<< getPc
+  incPc
+assembleStatement (S.Inst ms op ma mi mf) = do
+  registerSym ms =<< getPc
+  -- XXX assemble instruction into a word, store it in the stream
+  val <- storeInField' ma (1, 2) =<<
+         storeInField' mi (3, 3) =<<
+         storeInField' mf (4, 4) =<<
+         storeInField' (Just $ opCode op) (5, 5) 0
+  registerSym ms =<< getPc
+  append (MW False val) =<< getPc
+  incPc
+assembleStatement (S.End ms wv) = return ()
+  -- XXX deal with ms = Just.
+  -- XXX communicate the start address in the assemble state.

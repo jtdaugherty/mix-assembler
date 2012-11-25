@@ -5,6 +5,6 @@ Z       EQU     1+2+3
 LAB     LDA     2000
         LDA     3000,2(3:4)
         LDA     OP2,1
-2H      LDA     2B
-        ORIG    2000
+        LDA     2B
+        ALF     "BLECH"
         END     5
