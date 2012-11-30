@@ -4,6 +4,10 @@ import Control.Applicative ((<$>))
 import Data.List (intersperse)
 import Text.PrettyPrint.HughesPJ
 import System.MIX.Symbolic
+import System.MIX.Assembler
+    ( MIXWord(..)
+    , Program(..)
+    )
 import Data.Maybe (isJust, fromJust)
 
 ppAddress :: Address -> Doc
@@ -50,7 +54,7 @@ ppExpr (BinOp e1 rest) = hcat $ ppExpr e1 : restDocs
       pairDoc (op, e) = ppBinOp op <> ppExpr e
 
 ppAtomicExpr :: AtomicExpr -> Doc
-ppAtomicExpr (Num i) = text $ show i
+ppAtomicExpr (Num i) = int i
 ppAtomicExpr (Sym s) = ppSymbolRef s
 ppAtomicExpr Asterisk = text "*"
 
@@ -67,7 +71,7 @@ ppSymbol :: Symbol -> Doc
 ppSymbol (Symbol s) = text s
 
 mppSymbolDef :: Maybe DefinedSymbol -> Doc
-mppSymbolDef Nothing = empty
+mppSymbolDef Nothing = text " "
 mppSymbolDef (Just s) = ppSymbolDef s
 
 ppMIXALStmt :: MIXALStmt -> Doc
@@ -86,7 +90,7 @@ ppMIXALStmt (Inst s o addr i f) =
         where
           showSym = if isJust s
                     then ppSymbolDef $ fromJust s
-                    else empty
+                    else text " "
           sep1 = if isJust i
                  then text ","
                  else empty
@@ -98,3 +102,28 @@ ppMIXALStmt (Inst s o addr i f) =
                 else empty
           ppF Nothing = empty
           ppF (Just (FieldExpr e)) = text "(" <> ppExpr e <> text ")"
+
+ppSymEntry :: (DefinedSymbol, Int) -> Doc
+ppSymEntry (sym, off) =
+    ppSymbolDef sym $$ (nest 14 $ text " = " <> (int off))
+
+ppSegment :: (Int, [(MIXWord, MIXALStmt)]) -> Doc
+ppSegment (start, entries) =
+    hang (text "Segment:") 2 $ vcat (heading : entryLines)
+        where
+          entryLines = ppEntry <$> zip [start..] entries
+          heading = ppLine (text "Addr") (text "MIX Word") (text "MIXAL")
+          ppEntry (pc, (w, stmt)) = ppLine (int pc) (text $ show w) (ppMIXALStmt stmt)
+
+          ppLine c1 c2 c3 =
+              c1 $$ (nest 6 $ text "|" <+> (c2 $$ (nest 18 $ text "|" <+> c3)))
+
+ppProgram :: Program -> Doc
+ppProgram p =
+    let heading = text "Program start address:" <+> (int $ startAddress p)
+        stHeading = text "Equivalents:"
+    in vcat $ intersperse (text " ")
+           [ heading
+           , hang stHeading 2 $ vcat $ ppSymEntry <$> symbols p
+           , vcat $ intersperse (text " ") $ ppSegment <$> segments p
+           ]

@@ -1,7 +1,6 @@
 module Main where
 
 import System.Environment (getArgs)
-import Control.Monad (forM_)
 import Text.PrettyPrint.HughesPJ
 import Control.Applicative
 
@@ -29,13 +28,5 @@ main = do
 
            let program = assemble is
            putStrLn "Assembler output:"
-
-           putStrLn $ "Start address: " ++ (show $ startAddress program)
            putStrLn ""
-           forM_ (symbols program) $ \(sym, off) -> do
-                  putStrLn $ render $ ppSymbolDef sym $$ (nest 14 $ text " = " <> (text $ show off))
-           putStrLn ""
-           forM_ (instructions program) $ \(pc, w, s) -> do
-                  putStrLn $ (show pc) ++ " " ++ (show w)
-                  putStrLn $ render $ ppMIXALStmt s
-
+           putStrLn $ render $ ppProgram program

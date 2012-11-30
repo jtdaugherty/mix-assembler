@@ -1,6 +1,7 @@
 module System.MIX.Assembler
     ( assemble
-    , Program(startAddress, instructions, symbols)
+    , Program(startAddress, segments, symbols)
+    , MIXWord(..)
     )
 where
 
@@ -14,29 +15,7 @@ import qualified System.MIX.Symbolic as S
 import System.MIX.Char (charToByte)
 import System.MIX.OpCode
 
-import Debug.Trace
-
-data MIXWord = MW Bool Int
-               deriving (Eq)
-
-instance Show MIXWord where
-    show (MW s v) = concat [ "[ "
-                           , sgn
-                           , " "
-                           , showHex (getByte 1 v) " "
-                           , showHex (getByte 2 v) " "
-                           , showHex (getByte 3 v) " "
-                           , showHex (getByte 4 v) " "
-                           , showHex (getByte 5 v) ""
-                           , " ("
-                           , showBinary v
-                           , ") ]"
-                           ]
-        where
-          sgn = if s then "-" else "+"
-
-showBinary :: Int -> String
-showBinary v = showIntAtBase 2 intToDigit (abs v) ""
+-- import Debug.Trace
 
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, Int)]
@@ -48,12 +27,35 @@ data AssemblerState =
        }
 
 data Program =
-    Program { instructions :: [(Int, MIXWord, S.MIXALStmt)]
+    Program { segments :: [(Int, [(MIXWord, S.MIXALStmt)])]
             , symbols :: [(S.DefinedSymbol, Int)]
             , startAddress :: Int
             }
 
 type M a = State AssemblerState a
+
+data MIXWord = MW Bool Int
+               deriving (Eq)
+
+instance Show MIXWord where
+    show (MW s v) = concat [ -- "[ "
+                           -- , 
+                             sgn
+                           , " "
+                           , showHex (getByte 1 v) " "
+                           , showHex (getByte 2 v) " "
+                           , showHex (getByte 3 v) " "
+                           , showHex (getByte 4 v) " "
+                           , showHex (getByte 5 v) ""
+                           -- , " ("
+                           -- , showBinary v
+                           -- , ") ]"
+                           ]
+        where
+          sgn = if s then "-" else "+"
+
+showBinary :: Int -> String
+showBinary v = showIntAtBase 2 intToDigit (abs v) ""
 
 byteMask :: Int
 byteMask = 0x3F -- 111111
@@ -63,7 +65,6 @@ getByte num i =
     -- Right-shift the byte of interest down to the first 6 bits and
     -- then mask it
     shiftR i ((bytesPerWord - num) * bitsPerByte) .&. byteMask
-
 bitsPerByte :: Int
 bitsPerByte = 6
 
@@ -92,9 +93,29 @@ assemble :: [S.MIXALStmt] -> Program
 assemble ss =
     if isNothing $ startAddr st
     then error "Missing END in program"
-    else Program (output st) (equivalents st) (fromJust $ startAddr st)
+    else Program segs2 (equivalents st) (fromJust $ startAddr st)
         where
           st = execState (doAssembly ss) initialState
+          segs = getSegments $ output st
+          segs2 = extract <$> segs
+          f (_, w, s) = (w, s)
+          extract [] = undefined
+          extract allss@((pc, _, _):_) = (pc, f <$> allss)
+
+getSegments :: [(Int, a, b)] -> [[(Int, a, b)]]
+getSegments [] = []
+getSegments es = s : rest
+    where
+      s = getSegment (-1) [] es
+      rest = getSegments $ drop (length s) es
+
+      getSegment _ acc [] = acc
+      getSegment v acc ((i, a, b):ss) =
+          if null acc
+          then getSegment i [(i, a, b)] ss
+          else if i == v + 1
+               then getSegment i (acc++[(i, a, b)]) ss
+               else acc
 
 doAssembly :: [S.MIXALStmt] -> M ()
 doAssembly [] = return ()
@@ -198,6 +219,8 @@ clearByte i val =
 
 evalWValue :: S.WValue -> M Int
 evalWValue (S.WValue e mf rest) = do
+  -- XXX deal with sign bit
+
   -- Store the leftmost wvalue.
   val <- evalExpr e
   initial <- storeInField val mf 0
@@ -250,4 +273,4 @@ assembleStatement s@(S.End ms wv) = do
   v <- evalWValue wv
   case a of
     Just x -> error $ "Start address already declared to be " ++ show x
-    Nothing -> modify $ \s -> s { startAddr = Just v }
+    Nothing -> modify $ \st -> st { startAddr = Just v }
