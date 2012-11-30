@@ -36,18 +36,13 @@ data MIXWord = MW Bool Int
                deriving (Eq)
 
 instance Show MIXWord where
-    show (MW s v) = concat [ -- "[ "
-                           -- , 
-                             sgn
+    show (MW s v) = concat [ sgn
                            , " "
                            , showHex (getByte 1 v) " "
                            , showHex (getByte 2 v) " "
                            , showHex (getByte 3 v) " "
                            , showHex (getByte 4 v) " "
                            , showHex (getByte 5 v) ""
-                           -- , " ("
-                           -- , showBinary v
-                           -- , ") ]"
                            ]
         where
           sgn = if s then "-" else "+"
