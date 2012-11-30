@@ -234,7 +234,6 @@ assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
   incPc
 assembleStatement s@(S.Inst ms op ma mi mf) = do
   registerSym ms =<< getPc
-  -- XXX assemble instruction into a word, store it in the stream
   f <- case mf of
          Nothing -> return Nothing
          Just fld -> Just <$> fieldToAddr fld
