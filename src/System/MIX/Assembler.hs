@@ -15,8 +15,6 @@ import qualified System.MIX.Symbolic as S
 import System.MIX.Char (charToByte)
 import System.MIX.OpCode
 
--- import Debug.Trace
-
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, Int)]
        -- ^Includes symbols defined with EQU as well as symbols
@@ -180,8 +178,6 @@ storeInField' (Just a) (left, right) d = do
   let shiftAmt = (bytesPerWord - right) * bitsPerByte
       sval = shiftL s shiftAmt
       final = sval .|. (clearBytes [left..right] d)
-
-  -- trace ("Storing " ++ showBinary s ++ " in field (" ++ show left ++ ", " ++ show right ++ ") of " ++ showBinary d ++ " (shifted " ++ show shiftAmt ++ " bits); sval is " ++ showBinary sval ++ ", final is " ++ showBinary final) return ()
 
   return final
 
