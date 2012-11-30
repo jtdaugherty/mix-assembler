@@ -1,13 +1,14 @@
 module System.MIX.Assembler
     ( assemble
+    , Program(startAddress, instructions, symbols)
     )
 where
 
 import Control.Applicative ((<$>))
 import Control.Monad.State
 import Data.Bits
-import Data.Int (Int32)
 import Data.Char (intToDigit)
+import Data.Maybe
 import Numeric (showIntAtBase, showHex)
 import qualified System.MIX.Symbolic as S
 import System.MIX.Char (charToByte)
@@ -42,8 +43,15 @@ data AssemblerState =
        -- ^Includes symbols defined with EQU as well as symbols
        -- associated with program counter values.
        , programCounter :: Int
-       , output :: [(Int, MIXWord)]
+       , output :: [(Int, MIXWord, S.MIXALStmt)]
+       , startAddr :: Maybe Int
        }
+
+data Program =
+    Program { instructions :: [(Int, MIXWord, S.MIXALStmt)]
+            , symbols :: [(S.DefinedSymbol, Int)]
+            , startAddress :: Int
+            }
 
 type M a = State AssemblerState a
 
@@ -63,7 +71,7 @@ bytesPerWord :: Int
 bytesPerWord = 5
 
 initialState :: AssemblerState
-initialState = AS [] 0 []
+initialState = AS [] 0 [] Nothing
 
 getPc :: M Int
 getPc = programCounter <$> get
@@ -76,13 +84,17 @@ setPc :: Int -> M ()
 setPc i =
     modify (\s -> s { programCounter = i })
 
-append :: MIXWord -> Int -> M ()
-append inst pc =
-    modify (\s -> s { output = output s ++ [(pc, inst)] })
+append :: MIXWord -> S.MIXALStmt -> Int -> M ()
+append inst stmt pc =
+    modify (\s -> s { output = output s ++ [(pc, inst, stmt)] })
 
-assemble :: [S.MIXALStmt] -> [(Int, MIXWord)]
+assemble :: [S.MIXALStmt] -> Program
 assemble ss =
-    output $ execState (doAssembly ss) initialState
+    if isNothing $ startAddr st
+    then error "Missing END in program"
+    else Program (output st) (equivalents st) (fromJust $ startAddr st)
+        where
+          st = execState (doAssembly ss) initialState
 
 doAssembly :: [S.MIXALStmt] -> M ()
 doAssembly [] = return ()
@@ -134,14 +146,21 @@ evalBinOp S.Divide = div
 evalBinOp S.Frac = undefined
 evalBinOp S.Field = \a b -> a * 8 + b
 
-storeInField' :: Maybe Int -> (Int, Int) -> Int -> M Int
+evalAddress :: S.Address -> M Int
+evalAddress (S.AddrExpr e) = evalExpr e
+evalAddress (S.AddrRef ref) = resolveSymbol ref
+evalAddress (S.AddrLiteral l) = evalWValue l
+
+storeInField' :: Maybe S.Address -> (Int, Int) -> Int -> M Int
 storeInField' Nothing _ v = return v
-storeInField' (Just s) (left, right) d = do
+storeInField' (Just a) (left, right) d = do
+  s <- evalAddress a
+
   let shiftAmt = (bytesPerWord - right) * bitsPerByte
       sval = shiftL s shiftAmt
       final = sval .|. (clearBytes [left..right] d)
 
-  trace ("Storing " ++ showBinary s ++ " in field (" ++ show left ++ ", " ++ show right ++ ") of " ++ showBinary d ++ " (shifted " ++ show shiftAmt ++ " bits); sval is " ++ showBinary sval ++ ", final is " ++ showBinary final) return ()
+  -- trace ("Storing " ++ showBinary s ++ " in field (" ++ show left ++ ", " ++ show right ++ ") of " ++ showBinary d ++ " (shifted " ++ show shiftAmt ++ " bits); sval is " ++ showBinary sval ++ ", final is " ++ showBinary final) return ()
 
   return final
 
@@ -151,7 +170,16 @@ storeInField s (Just (S.FieldExpr f)) d = do
   fval <- evalExpr f
   let right = fval `mod` 8
       left = (fval - right) `div` 8
-  storeInField' (Just s) (left, right) d
+  storeInField' (Just $ toAddr s) (left, right) d
+
+toAddr :: Int -> S.Address
+toAddr = S.AddrExpr . S.AtExpr . S.Num
+
+indexToAddr :: S.Index -> S.Address
+indexToAddr (S.Index n) = toAddr n
+
+fieldToAddr :: S.Field -> M S.Address
+fieldToAddr (S.FieldExpr e) = toAddr <$> evalExpr e
 
 clearBytes :: (Bits a) => [Int] -> a -> a
 clearBytes [] = id
@@ -194,26 +222,33 @@ assembleStatement (S.Con ms wv) = do
   -- processing (i.e. abstract assembled statements)
   registerSym ms pc
   incPc
-assembleStatement (S.Alf ms (c1, c2, c3, c4, c5)) = do
-  val <- storeInField' (Just $ charToByte c1) (1, 1) =<<
-         storeInField' (Just $ charToByte c2) (2, 2) =<<
-         storeInField' (Just $ charToByte c3) (3, 3) =<<
-         storeInField' (Just $ charToByte c4) (4, 4) =<<
-         storeInField' (Just $ charToByte c5) (5, 5) 0
+assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
+  val <- storeInField' (Just $ toAddr $ charToByte c1) (1, 1) =<<
+         storeInField' (Just $ toAddr $ charToByte c2) (2, 2) =<<
+         storeInField' (Just $ toAddr $ charToByte c3) (3, 3) =<<
+         storeInField' (Just $ toAddr $ charToByte c4) (4, 4) =<<
+         storeInField' (Just $ toAddr $ charToByte c5) (5, 5) 0
   registerSym ms =<< getPc
   -- Store the instruction.
-  append (MW False val) =<< getPc
+  append (MW False val) s =<< getPc
   incPc
-assembleStatement (S.Inst ms op ma mi mf) = do
+assembleStatement s@(S.Inst ms op ma mi mf) = do
   registerSym ms =<< getPc
   -- XXX assemble instruction into a word, store it in the stream
+  f <- case mf of
+         Nothing -> return Nothing
+         Just fld -> Just <$> fieldToAddr fld
+
   val <- storeInField' ma (1, 2) =<<
-         storeInField' mi (3, 3) =<<
-         storeInField' mf (4, 4) =<<
-         storeInField' (Just $ opCode op) (5, 5) 0
-  registerSym ms =<< getPc
-  append (MW False val) =<< getPc
+         storeInField' (indexToAddr <$> mi) (3, 3) =<<
+         storeInField' f (4, 4) =<<
+         storeInField' (Just $ toAddr $ opCode op) (5, 5) 0
+  append (MW False val) s =<< getPc
   incPc
-assembleStatement (S.End ms wv) = return ()
+assembleStatement s@(S.End ms wv) = do
   -- XXX deal with ms = Just.
-  -- XXX communicate the start address in the assemble state.
+  a <- startAddr <$> get
+  v <- evalWValue wv
+  case a of
+    Just x -> error $ "Start address already declared to be " ++ show x
+    Nothing -> modify $ \s -> s { startAddr = Just v }

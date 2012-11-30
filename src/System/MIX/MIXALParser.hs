@@ -272,8 +272,10 @@ parseSymbolRef = choice $ try <$> [ parseLocalRefB
 
 parseSymbol :: Parser S.Symbol
 parseSymbol = do
-  let symChar = oneOf ['0'..'9'] <|> oneOf ['A'..'Z']
-  s <- many1 symChar
-  if (length s > 10) then
-      fail $ "Symbol too long: " ++ s else
-      return $ S.Symbol s
+  let startChar = oneOf ['A'..'Z']
+      restChar = oneOf ['0'..'9'] <|> oneOf ['A'..'Z']
+  c <- startChar
+  s <- many restChar
+  if (length s > 9) then
+      fail $ "Symbol too long: " ++ (c:s) else
+      return $ S.Symbol (c:s)

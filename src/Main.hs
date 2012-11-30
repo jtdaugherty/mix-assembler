@@ -27,8 +27,15 @@ main = do
            putStrLn ""
            putStrLn $ render $ vcat $ ppMIXALStmt <$> is
 
-           let result = assemble is
+           let program = assemble is
            putStrLn "Assembler output:"
 
-           forM_ result $ \(pc, w) ->
-               putStrLn $ (show pc) ++ "     " ++ (show w)
+           putStrLn $ "Start address: " ++ (show $ startAddress program)
+           putStrLn ""
+           forM_ (symbols program) $ \(sym, off) -> do
+                  putStrLn $ render $ ppSymbolDef sym $$ (nest 14 $ text " = " <> (text $ show off))
+           putStrLn ""
+           forM_ (instructions program) $ \(pc, w, s) -> do
+                  putStrLn $ (show pc) ++ " " ++ (show w)
+                  putStrLn $ render $ ppMIXALStmt s
+
