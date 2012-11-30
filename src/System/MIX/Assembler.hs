@@ -1,9 +1,4 @@
-module System.MIX.Assembler
-    ( assemble
-    , Program(startAddress, segments, symbols)
-    , MIXWord(..)
-    )
-where
+module System.MIX.Assembler where
 
 import Control.Applicative ((<$>))
 import Control.Monad.State
@@ -20,35 +15,29 @@ data AssemblerState =
        -- ^Includes symbols defined with EQU as well as symbols
        -- associated with program counter values.
        , programCounter :: Int
-       , output :: [(Int, MIXWord, S.MIXALStmt)]
+       , output :: [(Int, S.MIXWord, S.MIXALStmt)]
        , startAddr :: Maybe Int
        }
 
 data Program =
-    Program { segments :: [(Int, [(MIXWord, S.MIXALStmt)])]
+    Program { segments :: [(Int, [(S.MIXWord, S.MIXALStmt)])]
             , symbols :: [(S.DefinedSymbol, Int)]
             , startAddress :: Int
             }
 
 type M a = State AssemblerState a
 
-data MIXWord = MW Bool Int
-               deriving (Eq)
-
-instance Show MIXWord where
-    show (MW s v) = concat [ sgn
-                           , " "
-                           , showHex (getByte 1 v) " "
-                           , showHex (getByte 2 v) " "
-                           , showHex (getByte 3 v) " "
-                           , showHex (getByte 4 v) " "
-                           , showHex (getByte 5 v) ""
-                           ]
+instance Show S.MIXWord where
+    show (S.MW s v) = concat [ sgn
+                             , " "
+                             , showHex (getByte 1 v) " "
+                             , showHex (getByte 2 v) " "
+                             , showHex (getByte 3 v) " "
+                             , showHex (getByte 4 v) " "
+                             , showHex (getByte 5 v) ""
+                             ]
         where
           sgn = if s then "-" else "+"
-
-showBinary :: Int -> String
-showBinary v = showIntAtBase 2 intToDigit (abs v) ""
 
 byteMask :: Int
 byteMask = 0x3F -- 111111
@@ -78,7 +67,7 @@ setPc :: Int -> M ()
 setPc i =
     modify (\s -> s { programCounter = i })
 
-append :: MIXWord -> S.MIXALStmt -> Int -> M ()
+append :: S.MIXWord -> S.MIXALStmt -> Int -> M ()
 append inst stmt pc =
     modify (\s -> s { output = output s ++ [(pc, inst, stmt)] })
 
@@ -169,12 +158,20 @@ storeInField' :: Maybe S.Address -> (Int, Int) -> Int -> M Int
 storeInField' Nothing _ v = return v
 storeInField' (Just a) (left, right) d = do
   s <- evalAddress a
+  return $ storeInField'' s (left, right) d
 
-  let shiftAmt = (bytesPerWord - right) * bitsPerByte
-      sval = shiftL s shiftAmt
-      final = sval .|. (clearBytes [left..right] d)
-
-  return final
+storeInField'' :: Int -> (Int, Int) -> Int -> Int
+storeInField'' s (left, right) d =
+    let shiftAmt = (bytesPerWord - right) * bitsPerByte
+        sval = (abs s) `shiftL` shiftAmt
+        left' = max 1 left
+        final = sval .|. (clearBytes [left'..right] d)
+        sgn = if s < 0 then 1 else 0
+        finalWithSign = if left == 0
+                        then (sgn `shiftL` (bytesPerWord * bitsPerByte)) .|.
+                                 (clearBytes [0] final)
+                        else final
+    in finalWithSign
 
 storeInField :: Int -> Maybe S.Field -> Int -> M Int
 storeInField s Nothing _ = return s
@@ -244,7 +241,7 @@ assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
          storeInField' (Just $ toAddr $ charToByte c5) (5, 5) 0
   registerSym ms =<< getPc
   -- Store the instruction.
-  append (MW False val) s =<< getPc
+  append (S.MW False val) s =<< getPc
   incPc
 assembleStatement s@(S.Inst ms op ma mi mf) = do
   registerSym ms =<< getPc
@@ -252,11 +249,14 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
          Nothing -> return Nothing
          Just fld -> Just <$> fieldToAddr fld
 
-  val <- storeInField' ma (1, 2) =<<
+  val <- storeInField' ma (0, 2) =<<
          storeInField' (indexToAddr <$> mi) (3, 3) =<<
          storeInField' f (4, 4) =<<
          storeInField' (Just $ toAddr $ opCode op) (5, 5) 0
-  append (MW False val) s =<< getPc
+  let sgn = if getByte 0 val == 1
+            then True
+            else False
+  append (S.MW sgn $ clearByte 0 val) s =<< getPc
   incPc
 assembleStatement s@(S.End ms wv) = do
   -- XXX deal with ms = Just.

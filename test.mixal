@@ -2,8 +2,9 @@
 X       EQU     10000
 Y       EQU     -5
 Z       EQU     1+2+3
-        LDA     1000
+        LDA     -1000
 LAB     LDA     2000
+        LDA     2-Z
         LDA     3000,2(3:4)
         LDA     LAB,1
         ALF     "BLECH"

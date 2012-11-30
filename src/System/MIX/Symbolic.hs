@@ -7,6 +7,9 @@ module System.MIX.Symbolic where
 newtype MIXChar = MIXChar Char
     deriving (Eq, Show)
 
+data MIXWord = MW Bool Int
+               deriving (Eq)
+
 data MIXALStmt
     = Orig (Maybe DefinedSymbol) WValue
     | Equ (Maybe DefinedSymbol) WValue
