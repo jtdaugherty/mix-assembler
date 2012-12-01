@@ -196,8 +196,8 @@ parseExpr =
     -- expressions first, we'll only parse the first token in an
     -- expression and leave the rest to confuse subsequent parsers.
     choice $ try <$> [ parseBinOpExpr
-                     , S.AtExpr <$> parseAtomicExpr
                      , parseSignedExpr
+                     , S.AtExpr <$> parseAtomicExpr
                      ]
 
 parseBinOpExpr :: Parser S.Expr
@@ -226,8 +226,8 @@ parseBinOp =
 
 parseSignedExpr :: Parser S.Expr
 parseSignedExpr = do
-  sign <- (char '+' >> return True) <|>
-          (char '-' >> return False)
+  sign <- (char '+' >> return False) <|>
+          (char '-' >> return True)
   e <- parseAtomicExpr
   return $ S.Signed sign e
 
@@ -239,10 +239,7 @@ parseAtomicExpr =
                      ]
 
 parseInt :: Parser Int
-parseInt = parseNeg <|> parsePos
-    where
-      parseNeg = char '-' >> ((-1) *) <$> parsePos
-      parsePos = read <$> many1 digit
+parseInt = read <$> many1 digit
 
 parseDefinedSymbol :: Parser S.DefinedSymbol
 parseDefinedSymbol = choice $ try <$> [ parseLocalDef

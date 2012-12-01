@@ -21,6 +21,7 @@ Library
     System.MIX.Assembler
     System.MIX.Char
     System.MIX.OpCode
+    System.MIX.MIXWord
 
   Build-depends:
     base >= 4,

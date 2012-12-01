@@ -7,8 +7,10 @@ LAB     LDA     2000
         LDA     2-Z
         LDA     3000,2(3:4)
         LDA     LAB,1
+        LDA     *-1
         ALF     "BLECH"
         END     5
+VAR     CON     12345
 
         ORIG    144
         LDA     1234

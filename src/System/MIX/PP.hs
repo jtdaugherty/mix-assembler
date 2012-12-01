@@ -4,18 +4,15 @@ import Control.Applicative ((<$>))
 import Data.List (intersperse, intercalate)
 import Text.PrettyPrint.HughesPJ
 import System.MIX.Symbolic
-import System.MIX.Assembler
-    ( Program(..)
-    , getByte
-    , bitsPerByte
-    )
+import System.MIX.Assembler (Program(..))
+import System.MIX.MIXWord
 import Data.Char (intToDigit)
 import Numeric (showIntAtBase)
 import Data.Maybe (isJust, fromJust)
 
 ppBinaryWord :: MIXWord -> String
-ppBinaryWord (MW sgn v) =
-    intercalate " " $ [ if sgn then "1" else "0"
+ppBinaryWord v =
+    intercalate " " $ [ if isNegative v then "1" else "0"
                       , showByte b1
                       , showByte b2
                       , showByte b3
@@ -69,7 +66,7 @@ ppExpr :: Expr -> Doc
 ppExpr (AtExpr a) = ppAtomicExpr a
 ppExpr (Signed s e) = text sign <> ppAtomicExpr e
     where
-      sign = if s then "+" else "-"
+      sign = if s then "-" else "+"
 ppExpr (BinOp e1 rest) = hcat $ ppExpr e1 : restDocs
     where
       restDocs = pairDoc <$> rest
@@ -125,9 +122,13 @@ ppMIXALStmt (Inst s o addr i f) =
           ppF Nothing = empty
           ppF (Just (FieldExpr e)) = text "(" <> ppExpr e <> text ")"
 
-ppSymEntry :: (DefinedSymbol, Int) -> Doc
+ppSymEntry :: (DefinedSymbol, MIXWord) -> Doc
 ppSymEntry (sym, off) =
-    ppSymbolDef sym $$ (nest 14 $ text " = " <> (int off))
+    ppSymbolDef sym $$
+                nest 14 (
+                         text " = " <> (text $ show off) $$
+                         nest 20 (text " = " <> (int $ toInt off))
+                        )
 
 ppSegment :: (Int, [(MIXWord, MIXALStmt)]) -> Doc
 ppSegment (start, entries) =
@@ -142,7 +143,7 @@ ppSegment (start, entries) =
 
 ppProgram :: Program -> Doc
 ppProgram p =
-    let heading = text "Program start address:" <+> (int $ startAddress p)
+    let heading = text "Program start address:" <+> (int $ toInt $ startAddress p)
         stHeading = text "Equivalents:"
     in vcat $ intersperse (text " ")
            [ heading

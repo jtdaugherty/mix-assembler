@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module System.MIX.Symbolic where
 
 -- The type of symbolic MIXAL instructions.  These include symbolic
@@ -6,9 +7,6 @@ module System.MIX.Symbolic where
 
 newtype MIXChar = MIXChar Char
     deriving (Eq, Show)
-
-data MIXWord = MW Bool Int
-               deriving (Eq)
 
 data MIXALStmt
     = Orig (Maybe DefinedSymbol) WValue
