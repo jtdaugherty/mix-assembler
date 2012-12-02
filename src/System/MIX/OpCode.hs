@@ -2,150 +2,179 @@ module System.MIX.OpCode where
 
 import System.MIX.Symbolic
 
-opCode :: OpCode -> Int
+-- |Return the numeric version of an opcode.  If the opcode
+-- corresponds to a specific field value, return that too; otherwise
+-- Nothing.  In the Nothing case, the F value should be supplied by
+-- the user and assembled into (or extracted from) the binary
+-- instruction.  In the Just case a specific F-value is required to
+-- distinguish the opcode based on the instruction involved.
+opCode :: OpCode -> (Int, Maybe Int)
 opCode op =
     case op of
-      LDA -> 1
-      LDX -> 1
-      LD1 -> 1
-      LD2 -> 1
-      LD3 -> 1
-      LD4 -> 1
-      LD5 -> 1
-      LD6 -> 1
-      LDAN -> 1
-      LDXN -> 1
-      LD1N -> 1
-      LD2N -> 1
-      LD3N -> 1
-      LD4N -> 1
-      LD5N -> 1
-      LD6N -> 1
-      STA -> 1
-      STX -> 1
-      ST1 -> 1
-      ST2 -> 1
-      ST3 -> 1
-      ST4 -> 1
-      ST5 -> 1
-      ST6 -> 1
-      STJ -> 1
-      STZ -> 1
-      ADD -> 1
-      SUB -> 1
-      MUL -> 1
-      DIV -> 1
-      ENTA -> 1
-      ENTX -> 1
-      ENT1 -> 1
-      ENT2 -> 1
-      ENT3 -> 1
-      ENT4 -> 1
-      ENT5 -> 1
-      ENT6 -> 1
-      ENNA -> 1
-      ENNX -> 1
-      ENN1 -> 1
-      ENN2 -> 1
-      ENN3 -> 1
-      ENN4 -> 1
-      ENN5 -> 1
-      ENN6 -> 1
-      INCA -> 1
-      INCX -> 1
-      INC1 -> 1
-      INC2 -> 1
-      INC3 -> 1
-      INC4 -> 1
-      INC5 -> 1
-      INC6 -> 1
-      DECA -> 1
-      DECX -> 1
-      DEC1 -> 1
-      DEC2 -> 1
-      DEC3 -> 1
-      DEC4 -> 1
-      DEC5 -> 1
-      DEC6 -> 1
-      CMPA -> 1
-      CMPX -> 1
-      CMP1 -> 1
-      CMP2 -> 1
-      CMP3 -> 1
-      CMP4 -> 1
-      CMP5 -> 1
-      CMP6 -> 1
-      JMP -> 1
-      JSJ -> 1
-      JOV -> 1
-      JNOV -> 1
-      JL -> 1
-      JE -> 1
-      JG -> 1
-      JGE -> 1
-      JNE -> 1
-      JLE -> 1
-      JAN -> 1
-      JAZ -> 1
-      JAP -> 1
-      JANN -> 1
-      JANZ -> 1
-      JANP -> 1
-      JXN -> 1
-      JXZ -> 1
-      JXP -> 1
-      JXNN -> 1
-      JXNZ -> 1
-      JXNP -> 1
-      J1N -> 1
-      J1Z -> 1
-      J1P -> 1
-      J1NN -> 1
-      J1NZ -> 1
-      J1NP -> 1
-      J2N -> 1
-      J2Z -> 1
-      J2P -> 1
-      J2NN -> 1
-      J2NZ -> 1
-      J2NP -> 1
-      J3N -> 1
-      J3Z -> 1
-      J3P -> 1
-      J3NN -> 1
-      J3NZ -> 1
-      J3NP -> 1
-      J4N -> 1
-      J4Z -> 1
-      J4P -> 1
-      J4NN -> 1
-      J4NZ -> 1
-      J4NP -> 1
-      J5N -> 1
-      J5Z -> 1
-      J5P -> 1
-      J5NN -> 1
-      J5NZ -> 1
-      J5NP -> 1
-      J6N -> 1
-      J6Z -> 1
-      J6P -> 1
-      J6NN -> 1
-      J6NZ -> 1
-      J6NP -> 1
-      IN -> 1
-      OUT -> 1
-      IOC -> 1
-      JRED -> 1
-      JBUS -> 1
-      NUM -> 1
-      CHAR -> 1
-      SLA -> 1
-      SRA -> 1
-      SLAX -> 1
-      SRAX -> 1
-      SLC -> 1
-      SRC -> 1
-      MOVE -> 1
-      NOP -> 1
-      HLT -> 1
+      LDA -> (8, Nothing)
+      LDX -> (15, Nothing)
+      LD1 -> (9, Nothing)
+      LD2 -> (10, Nothing)
+      LD3 -> (11, Nothing)
+      LD4 -> (12, Nothing)
+      LD5 -> (13, Nothing)
+      LD6 -> (14, Nothing)
+
+      LDAN -> (16, Nothing)
+      LDXN -> (23, Nothing)
+      LD1N -> (17, Nothing)
+      LD2N -> (18, Nothing)
+      LD3N -> (19, Nothing)
+      LD4N -> (20, Nothing)
+      LD5N -> (21, Nothing)
+      LD6N -> (22, Nothing)
+
+      STA -> (24, Nothing)
+      STX -> (31, Nothing)
+      ST1 -> (25, Nothing)
+      ST2 -> (26, Nothing)
+      ST3 -> (27, Nothing)
+      ST4 -> (28, Nothing)
+      ST5 -> (29, Nothing)
+      ST6 -> (30, Nothing)
+      STJ -> (32, Nothing)
+      STZ -> (33, Nothing)
+
+      ADD -> (1, Nothing)
+      SUB -> (2, Nothing)
+      MUL -> (3, Nothing)
+      DIV -> (4, Nothing)
+
+      ENTA -> (48, Just 2)
+      ENTX -> (55, Just 2)
+      ENT1 -> (49, Just 2)
+      ENT2 -> (50, Just 2)
+      ENT3 -> (51, Just 2)
+      ENT4 -> (52, Just 2)
+      ENT5 -> (53, Just 2)
+      ENT6 -> (54, Just 2)
+
+      ENNA -> (48, Just 3)
+      ENNX -> (55, Just 3)
+      ENN1 -> (49, Just 3)
+      ENN2 -> (50, Just 3)
+      ENN3 -> (51, Just 3)
+      ENN4 -> (52, Just 3)
+      ENN5 -> (53, Just 3)
+      ENN6 -> (54, Just 3)
+
+      INCA -> (48, Just 0)
+      INCX -> (55, Just 0)
+      INC1 -> (49, Just 0)
+      INC2 -> (50, Just 0)
+      INC3 -> (51, Just 0)
+      INC4 -> (52, Just 0)
+      INC5 -> (53, Just 0)
+      INC6 -> (54, Just 0)
+
+      DECA -> (48, Just 1)
+      DECX -> (55, Just 1)
+      DEC1 -> (49, Just 1)
+      DEC2 -> (50, Just 1)
+      DEC3 -> (51, Just 1)
+      DEC4 -> (52, Just 1)
+      DEC5 -> (53, Just 1)
+      DEC6 -> (54, Just 1)
+
+      CMPA -> (56, Nothing)
+      CMPX -> (63, Nothing)
+      CMP1 -> (57, Nothing)
+      CMP2 -> (58, Nothing)
+      CMP3 -> (59, Nothing)
+      CMP4 -> (60, Nothing)
+      CMP5 -> (61, Nothing)
+      CMP6 -> (62, Nothing)
+
+      JMP -> (39, Just 0)
+      JSJ -> (39, Just 1)
+      JOV -> (39, Just 2)
+      JNOV -> (39, Just 3)
+
+      JL -> (39, Just 4)
+      JE -> (39, Just 5)
+      JG -> (39, Just 6)
+      JGE -> (39, Just 7)
+      JNE -> (39, Just 8)
+      JLE -> (39, Just 9)
+
+      JAN -> (40, Just 0)
+      JAZ -> (40, Just 1)
+      JAP -> (40, Just 2)
+      JANN -> (40, Just 3)
+      JANZ -> (40, Just 4)
+      JANP -> (40, Just 5)
+
+      JXN -> (47, Just 0)
+      JXZ -> (47, Just 1)
+      JXP -> (47, Just 2)
+      JXNN -> (47, Just 3)
+      JXNZ -> (47, Just 4)
+      JXNP -> (47, Just 5)
+
+      J1N -> (41, Just 0)
+      J1Z -> (41, Just 1)
+      J1P -> (41, Just 2)
+      J1NN -> (41, Just 3)
+      J1NZ -> (41, Just 4)
+      J1NP -> (41, Just 5)
+
+      J2N -> (42, Just 0)
+      J2Z -> (42, Just 1)
+      J2P -> (42, Just 2)
+      J2NN -> (42, Just 3)
+      J2NZ -> (42, Just 4)
+      J2NP -> (42, Just 5)
+
+      J3N -> (43, Just 0)
+      J3Z -> (43, Just 1)
+      J3P -> (43, Just 2)
+      J3NN -> (43, Just 3)
+      J3NZ -> (43, Just 4)
+      J3NP -> (43, Just 5)
+
+      J4N -> (44, Just 0)
+      J4Z -> (44, Just 1)
+      J4P -> (44, Just 2)
+      J4NN -> (44, Just 3)
+      J4NZ -> (44, Just 4)
+      J4NP -> (44, Just 5)
+
+      J5N -> (45, Just 0)
+      J5Z -> (45, Just 1)
+      J5P -> (45, Just 2)
+      J5NN -> (45, Just 3)
+      J5NZ -> (45, Just 4)
+      J5NP -> (45, Just 5)
+
+      J6N -> (46, Just 0)
+      J6Z -> (46, Just 1)
+      J6P -> (46, Just 2)
+      J6NN -> (46, Just 3)
+      J6NZ -> (46, Just 4)
+      J6NP -> (46, Just 5)
+
+      IN -> (36, Nothing)
+      OUT -> (37, Nothing)
+      IOC -> (35, Nothing)
+
+      JRED -> (38, Nothing)
+      JBUS -> (34, Nothing)
+
+      NUM -> (5, Just 0)
+      CHAR -> (5, Just 1)
+
+      SLA -> (6, Just 0)
+      SRA -> (6, Just 1)
+      SLAX -> (6, Just 2)
+      SRAX -> (6, Just 3)
+      SLC -> (6, Just 4)
+      SRC -> (6, Just 5)
+
+      MOVE -> (7, Nothing)
+      NOP -> (0, Nothing)
+      HLT -> (5, Just 2)

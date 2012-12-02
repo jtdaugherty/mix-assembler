@@ -200,10 +200,18 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
          Nothing -> return $ S.toWord 0
          Just addr -> evalAddress addr
 
+  let (opc, fld) = opCode op
+  when (isJust fld && isJust mf) $
+       error $ "Instruction " ++ (show op) ++ " provided field specification, but this instruction does not permit one"
+
+  let f' = if isJust fld
+           then S.toWord $ fromJust fld
+           else f
+
   let val = S.storeInField a (0, 2) $
             S.storeInField i (3, 3) $
-            S.storeInField f (4, 4) $
-            S.storeInField (S.toWord $ opCode op) (5, 5) (S.toWord 0)
+            S.storeInField f' (4, 4) $
+            S.storeInField (S.toWord opc) (5, 5) (S.toWord 0)
   append val s =<< getPc
   incPc
 assembleStatement (S.End _ms wv) = do
