@@ -9,9 +9,15 @@ import System.MIX.Symbolic
 rewriteLiteralConstants :: [MIXALStmt] -> [MIXALStmt]
 rewriteLiteralConstants [] = []
 rewriteLiteralConstants (s:ss) =
-    rewrittenS : (rewriteLiteralConstants ss ++ result)
+    result ++ (rewrittenS : rewriteLiteralConstants ss)
         where
-          (rewrittenS, result) = rewrite s
+          (rewrittenS, rewriteResult) = rewrite s
+          result = if null rewriteResult
+                   then []
+                   else jmp : rewriteResult
+          jmp = Inst Nothing JMP (Just jmpAmt) Nothing Nothing
+          jmpAmt = AddrExpr $ BinOp (AtExpr Asterisk)
+                   [(Add, AtExpr $ Num $ length result)]
 
 class Rewritable a where
     rewrite :: a -> (a, [MIXALStmt])
