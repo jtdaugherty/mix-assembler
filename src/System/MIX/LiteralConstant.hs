@@ -16,14 +16,12 @@ rewrite (Inst ms op (Just a) mf mi) =
 rewrite s = [s]
 
 rewriteAddress :: Address -> (Address, [MIXALStmt])
-rewriteAddress (LitConst e) = ( AddrRef $ sr
-                              , [jmp, Con (Just ds) e]
+rewriteAddress (LitConst e) = ( AddrExpr ref
+                              , [jmp, Con Nothing e]
                               )
     where
-      sn = "LITCONST"
-      ds = DefNormal $ Symbol sn
-      sr = RefNormal $ Symbol sn
       jmp = Inst Nothing JMP (Just jmpAmt) Nothing Nothing
       jmpAmt = AddrExpr $ BinOp (AtExpr Asterisk)
                [(Add, AtExpr $ Num 2)]
+      ref = BinOp (AtExpr Asterisk) [(Subtract, AtExpr $ Num 1)]
 rewriteAddress a = (a,[])
