@@ -1,15 +1,16 @@
-BUF     EQU     0
+BUF     EQU     123
 X       EQU     10000
 Y       EQU     -5
 Z       EQU     1+2+3
 
         ORIG    10
-        LDA     =-1*BUF=
+        LDA     =-1(1)=
         LDA     -1000
 LAB     LDA     2000
         LDA     2-Z
         LDA     3000,2(3:4)
         LDA     LAB,1
+        LDA     =BUF=
         LDA     *-1
         ALF     "BLECH"
         END     5

@@ -30,6 +30,7 @@ ppBinaryWord v =
           b5 = getByte 5 v
 
 ppAddress :: Address -> Doc
+ppAddress (LitConst wv) = text "=" <> ppWValue wv <> text "="
 ppAddress (AddrExpr e) = ppExpr e
 ppAddress (AddrRef s) = ppSymbolRef s
 ppAddress (AddrLiteral v) = text "=" <> ppWValue v <> text "="
@@ -63,7 +64,6 @@ ppOpCode :: OpCode -> Doc
 ppOpCode = text . show
 
 ppExpr :: Expr -> Doc
-ppExpr (LitConst e) = text "=" <> ppExpr e <> text "="
 ppExpr (AtExpr a) = ppAtomicExpr a
 ppExpr (Signed s e) = text sign <> ppAtomicExpr e
     where

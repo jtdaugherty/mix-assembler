@@ -90,8 +90,6 @@ registerSym (Just sym) w =
         }
 
 evalExpr :: S.Expr -> M S.MIXWord
-evalExpr (S.LitConst _) =
-    error "Should never happen due to rewriting"
 evalExpr (S.AtExpr ae) = evalAtomicExpr ae
 evalExpr (S.Signed s ae) = do
   val <- evalAtomicExpr ae
@@ -131,6 +129,7 @@ evalBinOp S.Frac = undefined
 evalBinOp S.Field = \a b -> S.addWord (S.multWord a (S.toWord 8)) b
 
 evalAddress :: S.Address -> M S.MIXWord
+evalAddress (S.LitConst _) = error "Should never happen due to rewriting"
 evalAddress (S.AddrExpr e) = evalExpr e
 evalAddress (S.AddrRef ref) = resolveSymbol ref
 evalAddress (S.AddrLiteral l) = evalWValue l

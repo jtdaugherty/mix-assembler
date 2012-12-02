@@ -52,7 +52,8 @@ parens p = do
 
 parseAddress :: Parser S.Address
 parseAddress =
-    choice $ try <$> [ S.AddrRef <$> parseSymbolRef
+    choice $ try <$> [ S.LitConst <$> parseLitConst
+                     , S.AddrRef <$> parseSymbolRef
                      , S.AddrExpr <$> parseExpr
                      , S.AddrLiteral <$> parseWValue
                      ]
@@ -195,18 +196,17 @@ parseExpr =
     -- parsing a maximal expression first.  If we try atomic or signed
     -- expressions first, we'll only parse the first token in an
     -- expression and leave the rest to confuse subsequent parsers.
-    choice $ try <$> [ parseLitConst
-                     , parseBinOpExpr
+    choice $ try <$> [ parseBinOpExpr
                      , parseSignedExpr
                      , S.AtExpr <$> parseAtomicExpr
                      ]
 
-parseLitConst :: Parser S.Expr
+parseLitConst :: Parser S.WValue
 parseLitConst = do
   _ <- char '='
-  e <- parseExpr
+  e <- parseWValue
   _ <- char '='
-  return $ S.LitConst e
+  return e
 
 parseBinOpExpr :: Parser S.Expr
 parseBinOpExpr = do
