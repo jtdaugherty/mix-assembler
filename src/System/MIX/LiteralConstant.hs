@@ -6,10 +6,11 @@ where
 import System.MIX.Symbolic
 
 rewriteLiteralConstants :: [MIXALStmt] -> [MIXALStmt]
-rewriteLiteralConstants = concat . map rewrite
+rewriteLiteralConstants = concatMap rewrite
 
 rewrite :: MIXALStmt -> [MIXALStmt]
-rewrite (Inst ms op (Just a) mf mi) = rest ++ [Inst ms op (Just newAddr) mf mi]
+rewrite (Inst ms op (Just a) mf mi) =
+    rest ++ [Inst ms op (Just newAddr) mf mi]
     where
       (newAddr, rest) = rewriteAddress a
 rewrite s = [s]
