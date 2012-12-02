@@ -7,6 +7,7 @@ import Control.Applicative
 import System.MIX.MIXALParser
 import System.MIX.PP
 import System.MIX.Assembler
+import System.MIX.LiteralConstant
 
 main :: IO ()
 main = do
@@ -25,6 +26,13 @@ main = do
            mapM_ (putStrLn . show) is
            putStrLn ""
            putStrLn $ render $ vcat $ ppMIXALStmt <$> is
+
+           putStrLn "Rewritten results:"
+           mapM_ (putStrLn . show) $ rewriteLiteralConstants is
+
+           putStrLn "Rewritten results (pretty):"
+           putStrLn ""
+           putStrLn $ render $ vcat $ ppMIXALStmt <$> rewriteLiteralConstants is
 
            let program = assemble is
            putStrLn "Assembler output:"

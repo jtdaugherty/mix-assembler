@@ -48,6 +48,7 @@ data AtomicExpr = Num Int
 data Expr = AtExpr AtomicExpr
           | Signed Bool AtomicExpr
           | BinOp Expr [(BinOp, Expr)]
+          | LitConst Expr
             deriving (Eq, Show)
 
 data BinOp = Add

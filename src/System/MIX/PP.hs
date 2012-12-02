@@ -63,6 +63,7 @@ ppOpCode :: OpCode -> Doc
 ppOpCode = text . show
 
 ppExpr :: Expr -> Doc
+ppExpr (LitConst e) = text "=" <> ppExpr e <> text "="
 ppExpr (AtExpr a) = ppAtomicExpr a
 ppExpr (Signed s e) = text sign <> ppAtomicExpr e
     where

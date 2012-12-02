@@ -1,7 +1,10 @@
-        ORIG    2
+BUF     EQU     0
 X       EQU     10000
 Y       EQU     -5
 Z       EQU     1+2+3
+
+        ORIG    10
+        LDA     =-1*BUF=
         LDA     -1000
 LAB     LDA     2000
         LDA     2-Z
@@ -12,5 +15,5 @@ LAB     LDA     2000
         END     5
 VAR     CON     12345
 
-        ORIG    144
-        LDA     1234
+        ORIG    BUF
+        CON     12345

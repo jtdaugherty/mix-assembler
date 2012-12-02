@@ -195,10 +195,18 @@ parseExpr =
     -- parsing a maximal expression first.  If we try atomic or signed
     -- expressions first, we'll only parse the first token in an
     -- expression and leave the rest to confuse subsequent parsers.
-    choice $ try <$> [ parseBinOpExpr
+    choice $ try <$> [ parseLitConst
+                     , parseBinOpExpr
                      , parseSignedExpr
                      , S.AtExpr <$> parseAtomicExpr
                      ]
+
+parseLitConst :: Parser S.Expr
+parseLitConst = do
+  _ <- char '='
+  e <- parseExpr
+  _ <- char '='
+  return $ S.LitConst e
 
 parseBinOpExpr :: Parser S.Expr
 parseBinOpExpr = do

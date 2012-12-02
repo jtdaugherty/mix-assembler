@@ -22,6 +22,7 @@ Library
     System.MIX.Char
     System.MIX.OpCode
     System.MIX.MIXWord
+    System.MIX.LiteralConstant
 
   Build-depends:
     base >= 4,

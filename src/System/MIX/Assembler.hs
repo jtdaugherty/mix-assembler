@@ -7,6 +7,7 @@ import qualified System.MIX.Symbolic as S
 import qualified System.MIX.MIXWord as S
 import System.MIX.Char (charToByte)
 import System.MIX.OpCode
+import System.MIX.LiteralConstant
 
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, S.MIXWord)]
@@ -47,7 +48,10 @@ append inst stmt pc =
            )
 
 assemble :: [S.MIXALStmt] -> Program
-assemble ss =
+assemble = assemble' . rewriteLiteralConstants
+
+assemble' :: [S.MIXALStmt] -> Program
+assemble' ss =
     if isNothing $ startAddr st
     then error "Missing END in program"
     else Program segs2 (equivalents st) (fromJust $ startAddr st)
@@ -86,6 +90,8 @@ registerSym (Just sym) w =
         }
 
 evalExpr :: S.Expr -> M S.MIXWord
+evalExpr (S.LitConst _) =
+    error "Should never happen due to rewriting"
 evalExpr (S.AtExpr ae) = evalAtomicExpr ae
 evalExpr (S.Signed s ae) = do
   val <- evalAtomicExpr ae
