@@ -301,6 +301,8 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
             append (Unresolved sym finish) s' =<< getPc
             appendLitConst sym e
     Nothing -> append (Ready $ finish $ S.toWord 0) s =<< getPc
+    Just (S.AddrRef (S.RefNormal ref)) -> do
+            append (Unresolved ref finish) s =<< getPc
     Just addr -> do
             v <- evalAddress addr
             append (Ready $ finish v) s =<< getPc
