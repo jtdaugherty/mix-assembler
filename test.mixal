@@ -11,7 +11,7 @@ LAB     LDA     2000
         LDA     3000,2(3:4)
         LDA     LAB,1
         LDA     =BUF=
-        LDA     EN
+        LDA     EN1
         ALF     "BLECH"
 VAR     CON     12345
 

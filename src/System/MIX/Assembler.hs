@@ -126,12 +126,13 @@ assemble' ss =
       (status, st) = runState (runErrorT act) initialState
       act = do
         doAssembly ss
-        a <- startAddr <$> get
-        when (isNothing a) $
+        curSt <- get
+        when (isNothing $ startAddr curSt) $
              err "Missing END directive"
-        lcs <- litConsts <$> get
-        forM_ lcs $ \(sym, wv) ->
-             assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
+        forM_ (litConsts curSt) $ \(sym, wv) -> do
+              st' <- get
+              when (isNothing $ lookup (S.DefNormal sym) (equivalents st')) $
+                   assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
 
       segs = getSegments . (processIntermediate <$>) . output
       segs2 s = extract <$> segs s
@@ -303,6 +304,7 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
     Nothing -> append (Ready $ finish $ S.toWord 0) s =<< getPc
     Just (S.AddrRef (S.RefNormal ref)) -> do
             append (Unresolved ref finish) s =<< getPc
+            appendLitConst ref $ S.WValue (S.AtExpr $ S.Num 0) Nothing []
     Just addr -> do
             v <- evalAddress addr
             append (Ready $ finish v) s =<< getPc
