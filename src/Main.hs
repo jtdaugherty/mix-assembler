@@ -9,6 +9,11 @@ import System.MIX.PP
 import System.MIX.Assembler
 import System.MIX.LiteralConstant
 
+formatMessage :: AsmError -> String
+formatMessage (AsmError s Nothing) = s
+formatMessage (AsmError s (Just stmt)) =
+    s ++ "\nLast processed statement:\n  " ++ (render $ ppMIXALStmt stmt)
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -34,7 +39,13 @@ main = do
            putStrLn ""
            putStrLn $ render $ vcat $ ppMIXALStmt <$> rewriteLiteralConstants is
 
-           let program = assemble is
-           putStrLn "Assembler output:"
-           putStrLn ""
-           putStrLn $ render $ ppProgram program
+           let result = assemble is
+
+           case result of
+             Left e -> do
+                  putStrLn "Error during assembly:"
+                  putStrLn $ formatMessage e
+             Right res -> do
+                  putStrLn "Assembler output:"
+                  putStrLn ""
+                  putStrLn $ render $ ppProgram $ program res

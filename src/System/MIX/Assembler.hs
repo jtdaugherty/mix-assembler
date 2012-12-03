@@ -2,12 +2,16 @@ module System.MIX.Assembler where
 
 import Control.Applicative ((<$>))
 import Control.Monad.State
+import Control.Monad.Error
 import Data.Maybe
 import qualified System.MIX.Symbolic as S
 import qualified System.MIX.MIXWord as S
 import System.MIX.Char (charToByte)
 import System.MIX.OpCode
 import System.MIX.LiteralConstant
+
+data LogMessage = Msg String (Maybe S.MIXALStmt)
+                  deriving (Show)
 
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, S.MIXWord)]
@@ -16,6 +20,8 @@ data AssemblerState =
        , programCounter :: S.MIXWord
        , output :: [(Int, S.MIXWord, S.MIXALStmt)]
        , startAddr :: Maybe S.MIXWord
+       , logMessages :: [LogMessage]
+       , currentStatement :: S.MIXALStmt
        }
 
 data Program =
@@ -24,10 +30,43 @@ data Program =
             , startAddress :: S.MIXWord
             }
 
-type M a = State AssemblerState a
+data AssemblerResult =
+    AssemblerResult { messages :: [LogMessage]
+                    , program :: Program
+                    }
+
+instance Error AsmError where
+    noMsg = AsmError "<empty>" Nothing
+    strMsg s = AsmError s Nothing
+
+data AsmError = AsmError String (Maybe S.MIXALStmt)
+
+type M a = ErrorT AsmError (State AssemblerState) a
+
+curStmt :: M S.MIXALStmt
+curStmt = currentStatement <$> get
+
+setCurStmt :: S.MIXALStmt -> M ()
+setCurStmt st = modify $ \s -> s { currentStatement = st }
+
+err :: String -> M a
+err s = (throwError . AsmError s) =<< (Just <$> curStmt)
+
+logMessage :: String -> Maybe S.MIXALStmt -> M ()
+logMessage msg st =
+    let m = Msg msg st
+    in modify $ \s -> s { logMessages = logMessages s ++ [m]
+                        }
 
 initialState :: AssemblerState
-initialState = AS [] (S.toWord 0) [] Nothing
+initialState =
+    AS { equivalents = []
+       , programCounter = S.toWord 0
+       , output = []
+       , startAddr = Nothing
+       , logMessages = []
+       , currentStatement = S.Orig Nothing $ S.WValue (S.AtExpr $ S.Num 0) Nothing []
+       }
 
 getPc :: M S.MIXWord
 getPc = programCounter <$> get
@@ -47,21 +86,30 @@ append inst stmt pc =
                     }
            )
 
-assemble :: [S.MIXALStmt] -> Program
+assemble :: [S.MIXALStmt] -> Either AsmError AssemblerResult
 assemble = assemble' . rewriteLiteralConstants
 
-assemble' :: [S.MIXALStmt] -> Program
+assemble' :: [S.MIXALStmt] -> Either AsmError AssemblerResult
 assemble' ss =
-    if isNothing $ startAddr st
-    then error "Missing END in program"
-    else Program segs2 (equivalents st) (fromJust $ startAddr st)
-        where
-          st = execState (doAssembly ss) initialState
-          segs = getSegments $ output st
-          segs2 = extract <$> segs
-          f (_, w, s) = (w, s)
-          extract [] = undefined
-          extract allss@((pc, _, _):_) = (pc, f <$> allss)
+    case status of
+      Left e -> Left e
+      Right _ -> Right $
+                 AssemblerResult { messages = logMessages st
+                                 , program = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
+                                 }
+    where
+      (status, st) = runState (runErrorT act) initialState
+      act = do
+        doAssembly ss
+        a <- startAddr <$> get
+        when (isNothing a) $
+             err "Missing END directive"
+
+      segs = getSegments . output
+      segs2 s = extract <$> segs s
+      f (_, w, s) = (w, s)
+      extract [] = undefined
+      extract allss@((pc, _, _):_) = (pc, f <$> allss)
 
 getSegments :: [(Int, a, b)] -> [[(Int, a, b)]]
 getSegments [] = []
@@ -80,7 +128,10 @@ getSegments es = s : rest
 
 doAssembly :: [S.MIXALStmt] -> M ()
 doAssembly [] = return ()
-doAssembly (s:ss) = assembleStatement s >> doAssembly ss
+doAssembly (s:ss) = do
+  setCurStmt s
+  assembleStatement s
+  doAssembly ss
 
 registerSym :: Maybe S.DefinedSymbol -> S.MIXWord -> M ()
 registerSym Nothing _ = return ()
@@ -110,7 +161,7 @@ resolveSymbol (S.RefNormal s) = do
   st <- get
   let result = lookup (S.DefNormal s) $ equivalents st
   case result of
-    Nothing -> error $ "No such symbol: " ++ show s
+    Nothing -> err $ "No such symbol " ++ show s
     Just v -> return v
 resolveSymbol (S.RefBackward _) = undefined
 resolveSymbol (S.RefForward _) = undefined
@@ -170,7 +221,7 @@ assembleStatement (S.Orig ms wv) = do
   registerSym ms =<< getPc
   v <- evalWValue wv
   when (S.toInt v < 0) $
-       error $ "Invalid ORIG instruction with negative argument: " ++ (show v)
+       err ("Invalid ORIG instruction with negative argument " ++ (show v))
   setPc v
 assembleStatement (S.Equ ms wv) = do
   val <- evalWValue wv
@@ -207,7 +258,7 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
 
   let (opc, fld) = opCode op
   when (isJust fld && isJust mf) $
-       error $ "Instruction " ++ (show op) ++ " provided field specification, but this instruction does not permit one"
+       err ("Instruction " ++ (show op) ++ " provided field specification, but this instruction does not permit one")
 
   let f' = if isJust fld
            then S.toWord $ fromJust fld
@@ -224,5 +275,5 @@ assembleStatement (S.End _ms wv) = do
   a <- startAddr <$> get
   v <- evalWValue wv
   case a of
-    Just x -> error $ "Start address already declared to be " ++ show x
+    Just x -> err ("Start address already declared to be " ++ show x)
     Nothing -> modify $ \st -> st { startAddr = Just v }
