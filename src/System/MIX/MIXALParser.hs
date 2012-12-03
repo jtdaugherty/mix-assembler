@@ -14,11 +14,13 @@ parseMIXAL filename doc = parse mixalParser filename doc
 
 mixalParser :: Parser [S.MIXALStmt]
 mixalParser = do
-  many1 p
+  ss <- many1 p
+  eof
+  return ss
     where
       p = do
         s <- parseStmt
-        (char '\n' >> return ()) <|> eof
+        (many1 (char '\n') >> return ()) <|> eof
         return s
 
 parseStmt :: Parser S.MIXALStmt
