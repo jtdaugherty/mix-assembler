@@ -78,7 +78,7 @@ initialState =
 nextLitConstSym :: M S.Symbol
 nextLitConstSym = do
   v <- litConstCounter <$> get
-  let sname = "litconst" ++ show v
+  let sname = "LITCON" ++ show v
   modify $ \s -> s { litConstCounter = v + 1 }
   return $ S.Symbol sname
 
@@ -297,7 +297,8 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
   case ma of
     Just (S.LitConst e) -> do
             sym <- nextLitConstSym
-            append (Unresolved sym finish) s =<< getPc
+            let s' = S.Inst ms op (Just $ S.AddrRef $ S.RefNormal sym) mi mf
+            append (Unresolved sym finish) s' =<< getPc
             appendLitConst sym e
     Nothing -> append (Ready $ finish $ S.toWord 0) s =<< getPc
     Just addr -> do
