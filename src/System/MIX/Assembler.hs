@@ -4,6 +4,7 @@ import Control.Applicative ((<$>))
 import Control.Monad.State
 import Control.Monad.Error
 import Data.Maybe
+import Data.Bits (shiftL)
 import qualified System.MIX.Symbolic as S
 import qualified System.MIX.MIXWord as S
 import System.MIX.Char (charToByte)
@@ -276,4 +277,8 @@ assembleStatement (S.End _ms wv) = do
   v <- evalWValue wv
   case a of
     Just x -> err ("Start address already declared to be " ++ show x)
-    Nothing -> modify $ \st -> st { startAddr = Just v }
+    Nothing -> do
+           let mx = (1 `shiftL` (2 * S.bitsPerByte)) - 1
+           when (S.toInt v > mx) $
+                err $ "END argument exceeds two-byte maximum (max value " ++ show mx ++ ")"
+           modify $ \st -> st { startAddr = Just v }
