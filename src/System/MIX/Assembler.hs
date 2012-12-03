@@ -258,7 +258,7 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
 
   let (opc, fld) = opCode op
   when (isJust fld && isJust mf) $
-       err ("Instruction " ++ (show op) ++ " provided field specification, but this instruction does not permit one")
+       err ("Field specification not permitted for Instruction type " ++ (show op))
 
   let f' = if isJust fld
            then S.toWord $ fromJust fld
