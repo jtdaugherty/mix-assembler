@@ -14,7 +14,7 @@ import System.MIX.Symbolic
 --
 --       LDA =...=
 --
---  becomes
+-- becomes
 --
 --       JMP *+2
 --       CON ...
