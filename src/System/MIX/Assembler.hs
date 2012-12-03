@@ -9,20 +9,24 @@ import qualified System.MIX.Symbolic as S
 import qualified System.MIX.MIXWord as S
 import System.MIX.Char (charToByte)
 import System.MIX.OpCode
-import System.MIX.LiteralConstant
 
 data LogMessage = Msg String (Maybe S.MIXALStmt)
                   deriving (Show)
+
+data Intermediate =
+    Ready S.MIXWord | Unresolved S.Symbol (S.MIXWord -> S.MIXWord)
 
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, S.MIXWord)]
        -- ^Includes symbols defined with EQU as well as symbols
        -- associated with program counter values.
        , programCounter :: S.MIXWord
-       , output :: [(Int, S.MIXWord, S.MIXALStmt)]
+       , output :: [(Int, Intermediate, S.MIXALStmt)]
        , startAddr :: Maybe S.MIXWord
        , logMessages :: [LogMessage]
        , currentStatement :: S.MIXALStmt
+       , litConstCounter :: Int
+       , litConsts :: [(S.Symbol, S.WValue)]
        }
 
 data Program =
@@ -67,7 +71,16 @@ initialState =
        , startAddr = Nothing
        , logMessages = []
        , currentStatement = S.Orig Nothing $ S.WValue (S.AtExpr $ S.Num 0) Nothing []
+       , litConstCounter = 0
+       , litConsts = []
        }
+
+nextLitConstSym :: M S.Symbol
+nextLitConstSym = do
+  v <- litConstCounter <$> get
+  let sname = "litconst" ++ show v
+  modify $ \s -> s { litConstCounter = v + 1 }
+  return $ S.Symbol sname
 
 getPc :: M S.MIXWord
 getPc = programCounter <$> get
@@ -80,15 +93,21 @@ setPc :: S.MIXWord -> M ()
 setPc i =
     modify (\s -> s { programCounter = i })
 
-append :: S.MIXWord -> S.MIXALStmt -> S.MIXWord -> M ()
+append :: Intermediate -> S.MIXALStmt -> S.MIXWord -> M ()
 append inst stmt pc =
     modify (\s -> s { output = output s ++
                                [(S.toInt pc, inst, stmt)]
                     }
            )
 
+appendLitConst :: S.Symbol -> S.WValue -> M ()
+appendLitConst sym wv =
+    modify (\s -> s { litConsts = litConsts s ++ [(sym, wv)]
+                    }
+           )
+
 assemble :: [S.MIXALStmt] -> Either AsmError AssemblerResult
-assemble = assemble' . rewriteLiteralConstants
+assemble = assemble'
 
 assemble' :: [S.MIXALStmt] -> Either AsmError AssemblerResult
 assemble' ss =
@@ -99,14 +118,22 @@ assemble' ss =
                                  , program = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
                                  }
     where
+      processIntermediate (pc, (Ready w), stmt) = (pc, w, stmt)
+      processIntermediate (pc, (Unresolved s mk), stmt) =
+          let Just loc = lookup (S.DefNormal s) $ equivalents st
+          in (pc, mk loc, stmt)
+
       (status, st) = runState (runErrorT act) initialState
       act = do
         doAssembly ss
         a <- startAddr <$> get
         when (isNothing a) $
              err "Missing END directive"
+        lcs <- litConsts <$> get
+        forM_ lcs $ \(sym, wv) ->
+             assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
 
-      segs = getSegments . output
+      segs = getSegments . (processIntermediate <$>) . output
       segs2 s = extract <$> segs s
       f (_, w, s) = (w, s)
       extract [] = undefined
@@ -181,7 +208,7 @@ evalBinOp S.Frac = undefined
 evalBinOp S.Field = \a b -> S.addWord (S.multWord a (S.toWord 8)) b
 
 evalAddress :: S.Address -> M S.MIXWord
-evalAddress (S.LitConst _) = error "Should never happen due to rewriting"
+evalAddress (S.LitConst _) = error "Should never happen"
 evalAddress (S.AddrExpr e) = evalExpr e
 evalAddress (S.AddrRef ref) = resolveSymbol ref
 evalAddress (S.AddrLiteral l) = evalWValue l
@@ -231,7 +258,7 @@ assembleStatement s@(S.Con ms wv) = do
   w <- evalWValue wv
   pc <- getPc
   registerSym ms pc
-  append w s pc
+  append (Ready w) s pc
   incPc
 assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
   let val = S.storeInField (charToByte c1) (1, 1) $
@@ -241,7 +268,7 @@ assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
             S.storeInField (charToByte c5) (5, 5) (S.toWord 0)
   registerSym ms =<< getPc
   -- Store the instruction.
-  append val s =<< getPc
+  append (Ready val) s =<< getPc
   incPc
 assembleStatement s@(S.Inst ms op ma mi mf) = do
   registerSym ms =<< getPc
@@ -253,10 +280,6 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
          Nothing -> return $ S.toWord 0
          Just (S.Index ival) -> return $ S.toWord ival
 
-  a <- case ma of
-         Nothing -> return $ S.toWord 0
-         Just addr -> evalAddress addr
-
   let (opc, fld) = opCode op
   when (isJust fld && isJust mf) $
        err ("Field specification not permitted for Instruction type " ++ (show op))
@@ -265,11 +288,21 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
            then S.toWord $ fromJust fld
            else f
 
-  let val = S.storeInField a (0, 2) $
-            S.storeInField i (3, 3) $
-            S.storeInField f' (4, 4) $
-            S.storeInField (S.toWord opc) (5, 5) (S.toWord 0)
-  append val s =<< getPc
+      finish a =
+          S.storeInField a (0, 2) $
+           S.storeInField i (3, 3) $
+           S.storeInField f' (4, 4) $
+           S.storeInField (S.toWord opc) (5, 5) (S.toWord 0)
+
+  case ma of
+    Just (S.LitConst e) -> do
+            sym <- nextLitConstSym
+            append (Unresolved sym finish) s =<< getPc
+            appendLitConst sym e
+    Nothing -> append (Ready $ finish $ S.toWord 0) s =<< getPc
+    Just addr -> do
+            v <- evalAddress addr
+            append (Ready $ finish v) s =<< getPc
   incPc
 assembleStatement (S.End _ms wv) = do
   -- XXX deal with ms = Just.
