@@ -307,8 +307,8 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
             v <- evalAddress addr
             append (Ready $ finish v) s =<< getPc
   incPc
-assembleStatement (S.End _ms wv) = do
-  -- XXX deal with ms = Just.
+assembleStatement (S.End ms wv) = do
+  registerSym ms =<< getPc
   a <- startAddr <$> get
   v <- evalWValue wv
   case a of
