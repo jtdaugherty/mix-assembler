@@ -115,9 +115,11 @@ assemble' ss =
       Left e -> Left e
       Right _ -> Right $
                  AssemblerResult { messages = logMessages st
-                                 , program = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
+                                 , program = p
                                  }
     where
+      p = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
+
       processIntermediate (pc, (Ready w), stmt) = (pc, w, stmt)
       processIntermediate (pc, (Unresolved s mk), stmt) =
           let Just loc = lookup (S.DefNormal s) $ equivalents st
