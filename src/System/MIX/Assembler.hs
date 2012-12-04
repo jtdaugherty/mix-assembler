@@ -261,16 +261,15 @@ fieldToWord (S.FieldExpr e) = evalExpr e
 
 evalWValue :: S.WValue -> M S.MIXWord
 evalWValue (S.WValue e mf es) = do
-  -- XXX deal with sign bit
-
   let toFieldPair f =
           case f of
             Nothing -> return (0, 5)
-            Just (S.FieldExpr fe) -> do
-                                  v <- evalExpr fe
-                                  let r = (S.toInt v) `mod` 8
-                                      l = (S.toInt v) `div` 8
-                                  return (l, r)
+            Just (S.FieldExpr fe) ->
+                do
+                  v <- evalExpr fe
+                  let r = (S.toInt v) `mod` 8
+                      l = (S.toInt v) `div` 8
+                  return (l, r)
 
   -- Store the leftmost wvalue.
   val <- evalExpr e
