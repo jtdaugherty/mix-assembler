@@ -117,6 +117,13 @@ assembleStage1 ss =
     where
       (status, st) = runState (runErrorT (assemblyMain ss)) initialState
 
+-- |First stage assembly.  Tracks declared symbols as it goes, using
+-- them to evaluate expressions.  Converts MIXAL statements into
+-- binary instructions.  Will throw an AsmError on failure.  This is
+-- the first of two stages; in this stage we finish up with a
+-- partially assembled program.  Some instructions will be assembled,
+-- others will reference unresolved symbols assigned to literal
+-- constants.
 assemblyMain :: [S.MIXALStmt] -> M ()
 assemblyMain ss = do
   doAssembly ss
@@ -141,6 +148,17 @@ assemblyMain ss = do
         when (isNothing $ lookup (S.DefNormal sym) (equivalents st')) $
              assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
 
+-- |Second stage assembly.  The first stage produces a
+-- partially-assembled program but leaves literal constant references
+-- unresolved.  This stage of assembly happens after the user's
+-- program has been scanned and assembled to the extent possible.
+-- This step is responsible for processing the MIXAL statements with
+-- unresolved literal constant references now that we know the
+-- addresses of those literal constant words in memory.  The assembly
+-- of those referencing instructions is finished by providing them
+-- with the needed memory locations of the literal constant
+-- expressions they referenced.  The final result is always a complete
+-- program; this step can never fail.
 assembleStage2 :: AssemblerState -> AssemblerResult
 assembleStage2 st =
     AssemblerResult { messages = logMessages st
