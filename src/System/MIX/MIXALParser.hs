@@ -4,7 +4,7 @@ module System.MIX.MIXALParser
 where
 
 import qualified System.MIX.Symbolic as S
-import System.MIX.Char (chars)
+import System.MIX.Char (mixChars)
 import Control.Applicative ((<$>))
 import Control.Monad (replicateM)
 import Text.ParserCombinators.Parsec
@@ -172,7 +172,7 @@ parseCon s = do
   return $ S.Con s w
 
 mixChar :: Parser S.MIXChar
-mixChar = S.MIXChar <$> oneOf chars
+mixChar = S.MIXChar <$> oneOf mixChars
 
 parseAlf :: Maybe S.DefinedSymbol -> Parser S.MIXALStmt
 parseAlf s = do
