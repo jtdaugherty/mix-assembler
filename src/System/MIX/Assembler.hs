@@ -177,15 +177,16 @@ evalExpr (S.Signed s ae) = do
   val <- evalAtomicExpr ae
   let sgn = if s then S.setNegative else S.clearNegative
   return $ sgn val
-evalExpr (S.BinOp _ []) = error "Invalid, should be prevented by parser"
-evalExpr (S.BinOp e1 rest) = do
+evalExpr (S.BinOp e1 op1 e2 rest) = do
   e1val <- evalExpr e1
+  e2val <- evalExpr e2
+  let first = evalBinOp op1 e1val e2val
 
   let next prev (op, e) = do
-        e2val <- evalExpr e
-        return $ evalBinOp op prev e2val
+        eval <- evalExpr e
+        return $ evalBinOp op prev eval
 
-  foldM next e1val rest
+  foldM next first rest
 
 resolveSymbol :: S.SymbolRef -> M S.MIXWord
 resolveSymbol (S.RefNormal s) = do

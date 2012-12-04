@@ -68,9 +68,9 @@ ppExpr (AtExpr a) = ppAtomicExpr a
 ppExpr (Signed s e) = text sign <> ppAtomicExpr e
     where
       sign = if s then "-" else "+"
-ppExpr (BinOp e1 rest) = hcat $ ppExpr e1 : restDocs
+ppExpr (BinOp e1 op1 e2 rest) = hcat $ ppExpr e1 : restDocs
     where
-      restDocs = pairDoc <$> rest
+      restDocs = pairDoc <$> ((op1, e2):rest)
       pairDoc (op, e) = ppBinOp op <> ppExpr e
 
 ppAtomicExpr :: AtomicExpr -> Doc

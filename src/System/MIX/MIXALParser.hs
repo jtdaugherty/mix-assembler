@@ -215,14 +215,19 @@ parseBinOpExpr = do
   e1 <- choice [ S.AtExpr <$> parseAtomicExpr
                , parseSignedExpr
                ]
-  rest <- many1 $ do
+  op1 <- parseBinOp
+  e2 <- choice [ S.AtExpr <$> parseAtomicExpr
+               , parseSignedExpr
+               ]
+
+  rest <- many $ do
             op <- parseBinOp
             e <- choice [ S.AtExpr <$> parseAtomicExpr
                         , parseSignedExpr
                         ]
             return (op, e)
 
-  return $ S.BinOp e1 rest
+  return $ S.BinOp e1 op1 e2 rest
 
 parseBinOp :: Parser S.BinOp
 parseBinOp =
