@@ -1,4 +1,11 @@
-module System.MIX.Assembler where
+module System.MIX.Assembler
+    ( LogMessage(..)
+    , Program(segments, symbols, startAddress)
+    , AssemblerResult(messages, program)
+    , AsmError(..)
+    , assemble
+    )
+where
 
 import Control.Applicative ((<$>))
 import Control.Monad.State
@@ -56,12 +63,6 @@ setCurStmt st = modify $ \s -> s { currentStatement = st }
 
 err :: String -> M a
 err s = (throwError . AsmError s) =<< (Just <$> curStmt)
-
-logMessage :: String -> Maybe S.MIXALStmt -> M ()
-logMessage msg st =
-    let m = Msg msg st
-    in modify $ \s -> s { logMessages = logMessages s ++ [m]
-                        }
 
 initialState :: AssemblerState
 initialState =
@@ -253,9 +254,6 @@ evalAddress (S.AddrExpr e) = evalExpr e
 evalAddress (S.AddrRef ref) = resolveSymbol ref
 evalAddress (S.AddrLiteral l) = evalWValue l
 
-indexToWord :: S.Index -> S.MIXWord
-indexToWord (S.Index n) = S.toWord n
-
 fieldToWord :: S.Field -> M S.MIXWord
 fieldToWord (S.FieldExpr e) = evalExpr e
 
@@ -306,11 +304,11 @@ assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
             S.storeInField (charToByte c4) (4, 4) $
             S.storeInField (charToByte c5) (5, 5) (S.toWord 0)
   registerSym ms =<< getPc
-  -- Store the instruction.
   append (Ready val) s =<< getPc
   incPc
 assembleStatement s@(S.Inst ms op ma mi mf) = do
-  registerSym ms =<< getPc
+  pc <- getPc
+  registerSym ms pc
   f <- case mf of
          Nothing -> return $ S.toWord 5 -- (0:5) = 0*8 + 5
          Just fld -> fieldToWord fld
@@ -337,15 +335,15 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
     Just (S.LitConst e) -> do
             sym <- nextLitConstSym
             let s' = S.Inst ms op (Just $ S.AddrRef $ S.RefNormal sym) mi mf
-            append (Unresolved sym finish) s' =<< getPc
+            append (Unresolved sym finish) s' pc
             appendLitConst sym e
-    Nothing -> append (Ready $ finish $ S.toWord 0) s =<< getPc
+    Nothing -> append (Ready $ finish $ S.toWord 0) s pc
     Just (S.AddrRef (S.RefNormal ref)) -> do
-            append (Unresolved ref finish) s =<< getPc
+            append (Unresolved ref finish) s pc
             appendLitConst ref $ S.WValue (S.AtExpr $ S.Num 0) Nothing []
     Just addr -> do
             v <- evalAddress addr
-            append (Ready $ finish v) s =<< getPc
+            append (Ready $ finish v) s pc
   incPc
 assembleStatement (S.End ms wv) = do
   registerSym ms =<< getPc
