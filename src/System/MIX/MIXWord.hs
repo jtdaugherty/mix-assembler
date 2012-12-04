@@ -7,6 +7,7 @@ module System.MIX.MIXWord
     , toInt
     , setNegative
     , clearNegative
+    , clearByte
 
     , addWord
     , subWord
@@ -87,12 +88,16 @@ bytesPerWord :: Int
 bytesPerWord = 5
 
 storeInField :: MIXWord -> (Int, Int) -> MIXWord -> MIXWord
-storeInField s@(MW sv) (left, right) (MW d) =
+storeInField (MW sv) (left, right) (MW d) =
     let shiftAmt = (bytesPerWord - right) * bitsPerByte
-        sval = (clearByte 0 sv) `shiftL` shiftAmt
+        totalBits = (right - left + 1) * bitsPerByte
+        keepBits = (1 `shiftL` totalBits) - 1
+        sval = (sv .&. keepBits) `shiftL` shiftAmt
         left' = max 1 left
         final = sval .|. (clearBytes [left'..right] d)
-        sgn = if isNegative s && left == 0 then signBit else (d .&. signBit)
+        sgn = if left == 0
+              then sv .&. signBit
+              else d .&. signBit
         finalWithSign = sgn .|. clearByte 0 final
     in MW finalWithSign
 
