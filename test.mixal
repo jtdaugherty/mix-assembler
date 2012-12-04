@@ -4,9 +4,11 @@ Y       EQU     -5
 Z       EQU     1+2+3
 
 START   ORIG    10
-        LDA     =-1(1)=
+        LDA     1
+        LDA     =1,-1000(0:2)=
+        LDA     =-1000(0:2),1=
         LDA     -1000
-LAB     LDA     2000
+LAB     LDA     2000(1)
         LDA     2-Z
         LDA     3000,2(3:4)
         LDA     LAB,1
