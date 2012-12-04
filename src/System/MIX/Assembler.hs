@@ -20,8 +20,8 @@ import System.MIX.OpCode
 data LogMessage = Msg String (Maybe S.MIXALStmt)
                   deriving (Show)
 
-data Intermediate =
-    Ready S.MIXWord | Unresolved S.Symbol (S.MIXWord -> S.MIXWord)
+data Intermediate = Ready S.MIXWord
+                  | Unresolved S.Symbol (S.MIXWord -> S.MIXWord)
 
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, S.MIXWord)]
