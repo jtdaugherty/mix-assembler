@@ -1,5 +1,6 @@
 module System.MIX.MIXWord
     ( MIXWord
+    , wordMask
     , getByte
     , storeInField
     , toWord
@@ -42,11 +43,14 @@ showByte b = pad ++ h
       h = showHex b ""
       pad = if length h == 1 then "0" else ""
 
+wordMask :: Int
+wordMask = 2 ^ (bitsPerByte * bytesPerWord) - 1
+
 toWord :: Int -> MIXWord
 toWord i =
     MW $ if i < 0
-         then (abs i) .|. signBit
-         else abs i
+         then (abs i .&. wordMask) .|. signBit
+         else abs i .&. wordMask
 
 toInt :: MIXWord -> Int
 toInt (MW v) =
