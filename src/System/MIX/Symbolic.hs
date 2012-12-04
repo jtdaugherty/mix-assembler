@@ -1,9 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module System.MIX.Symbolic where
-
--- The type of symbolic MIXAL instructions.  These include symbolic
--- names for instruction locations, symbolic references, literal
--- constants, assembler directives (ORIG, CON, etc.).
 
 newtype MIXChar = MIXChar Char
     deriving (Eq, Show)
