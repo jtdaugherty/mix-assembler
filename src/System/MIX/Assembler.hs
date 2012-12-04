@@ -107,25 +107,16 @@ appendLitConst sym wv =
            )
 
 assemble :: [S.MIXALStmt] -> Either AsmError AssemblerResult
-assemble = assemble'
+assemble ss = assembleStage1 ss >>= (return . assembleStage2)
 
-assemble' :: [S.MIXALStmt] -> Either AsmError AssemblerResult
-assemble' ss =
+assembleStage1 :: [S.MIXALStmt] -> Either AsmError AssemblerState
+assembleStage1 ss =
     case status of
       Left e -> Left e
-      Right _ -> Right $
-                 AssemblerResult { messages = logMessages st
-                                 , program = p
-                                 }
+      Right _ -> Right st
     where
-      p = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
-
-      processIntermediate (pc, (Ready w), stmt) = (pc, w, stmt)
-      processIntermediate (pc, (Unresolved s mk), stmt) =
-          let Just loc = lookup (S.DefNormal s) $ equivalents st
-          in (pc, mk loc, stmt)
-
       (status, st) = runState (runErrorT act) initialState
+
       act = do
         doAssembly ss
         curSt <- get
@@ -136,11 +127,24 @@ assemble' ss =
               when (isNothing $ lookup (S.DefNormal sym) (equivalents st')) $
                    assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
 
-      segs = getSegments . (processIntermediate <$>) . output
-      segs2 s = extract <$> segs s
-      f (_, w, s) = (w, s)
-      extract [] = undefined
-      extract allss@((pc, _, _):_) = (pc, f <$> allss)
+assembleStage2 :: AssemblerState -> AssemblerResult
+assembleStage2 st =
+    AssemblerResult { messages = logMessages st
+                    , program = p
+                    }
+        where
+          p = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
+
+          processIntermediate (pc, (Ready w), stmt) = (pc, w, stmt)
+          processIntermediate (pc, (Unresolved s mk), stmt) =
+              let Just loc = lookup (S.DefNormal s) $ equivalents st
+              in (pc, mk loc, stmt)
+
+          segs = getSegments . (processIntermediate <$>) . output
+          segs2 s = extract <$> segs s
+          f (_, w, s) = (w, s)
+          extract [] = undefined
+          extract allss@((pc, _, _):_) = (pc, f <$> allss)
 
 getSegments :: [(Int, a, b)] -> [[(Int, a, b)]]
 getSegments [] = []
