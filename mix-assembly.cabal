@@ -38,3 +38,21 @@ Executable mixal
     parsec,
     mtl,
     pretty
+
+Executable mixal-tests
+  Hs-Source-Dirs:    tests
+  Main-is:           TestDriver.hs
+  GHC-Options:       -Wall
+
+  Other-Modules:
+    Tests.MIXWord
+
+  Build-Depends:
+    base,
+    parsec,
+    mtl,
+    pretty,
+    test-framework,
+    test-framework-quickcheck2,
+    QuickCheck,
+    mix-assembly
