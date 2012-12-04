@@ -115,17 +115,31 @@ assembleStage1 ss =
       Left e -> Left e
       Right _ -> Right st
     where
-      (status, st) = runState (runErrorT act) initialState
+      (status, st) = runState (runErrorT (assemblyMain ss)) initialState
 
-      act = do
-        doAssembly ss
-        curSt <- get
-        when (isNothing $ startAddr curSt) $
-             err "Missing END directive"
-        forM_ (litConsts curSt) $ \(sym, wv) -> do
-              st' <- get
-              when (isNothing $ lookup (S.DefNormal sym) (equivalents st')) $
-                   assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
+assemblyMain :: [S.MIXALStmt] -> M ()
+assemblyMain ss = do
+  doAssembly ss
+
+  -- After assembling the statements from the program, we need to 1)
+  -- check that an END directive was present to set the start address
+  -- of the program and 2) that for each symbol reference in the
+  -- program, if there isn't already a known address for the symbol,
+  -- we insert a zero word labeled with the symbol in question (as per
+  -- TAOCP's specification that references to symbols should
+  -- effectively result in a word being reserved for them with an
+  -- initial value of zero).
+
+  curSt <- get
+
+  when (isNothing $ startAddr curSt) $
+       err "Missing END directive"
+
+  forM_ (litConsts curSt) $ \(sym, wv) ->
+      do
+        st' <- get
+        when (isNothing $ lookup (S.DefNormal sym) (equivalents st')) $
+             assembleStatement (S.Con (Just $ S.DefNormal sym) wv)
 
 assembleStage2 :: AssemblerState -> AssemblerResult
 assembleStage2 st =
