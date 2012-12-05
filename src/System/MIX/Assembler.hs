@@ -186,13 +186,24 @@ getSegments es = s : rest
       s = getSegment (-1) [] es
       rest = getSegments $ drop (length s) es
 
+      -- getSegment: given a list of assembler data, return the
+      -- longest prefix such that each two consecutive entries have
+      -- consecutive i-values.
+
+      -- If there's nothing left, return the current segment
       getSegment _ acc [] = acc
+      -- If this is the first item we're processing, add it to the
+      -- segment and keep going to seed the comparison against the
+      -- i-value.
+      getSegment _ [] ((i, a, b):ss) =
+          getSegment i [(i, a, b)] ss
+      -- If the current entry immediately follows the i-value of the
+      -- previous one, add it to the current segment and continue.
+      -- Otherwise, stop now and return the segment we've built.
       getSegment v acc ((i, a, b):ss) =
-          if null acc
-          then getSegment i [(i, a, b)] ss
-          else if i == v + 1
-               then getSegment i (acc++[(i, a, b)]) ss
-               else acc
+          if i == v + 1
+          then getSegment i (acc++[(i, a, b)]) ss
+          else acc
 
 doAssembly :: [S.MIXALStmt] -> M ()
 doAssembly [] = return ()
