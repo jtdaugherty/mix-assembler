@@ -13,6 +13,10 @@ formatMessage (UnresolvedLocalForward i Nothing) =
     "Unresolved forward reference for " ++ show i
 formatMessage (UnresolvedLocalForward i (Just s)) =
     "Unresolved forward reference for " ++ show i ++ "\n  " ++ (render $ ppMIXALStmt s)
+formatMessage (UnresolvedSymbol sym (Just s)) =
+    "Unresolved symbol " ++ show sym ++ "\n  " ++ (render $ ppMIXALStmt s)
+formatMessage (UnresolvedSymbol sym Nothing) =
+    "Unresolved symbol " ++ show sym
 formatMessage (AsmError s Nothing) = s
 formatMessage (AsmError s (Just stmt)) =
     s ++ "\nLast processed statement:\n  " ++ (render $ ppMIXALStmt stmt)

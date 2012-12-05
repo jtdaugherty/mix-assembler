@@ -58,6 +58,7 @@ instance Error AsmError where
 
 data AsmError = AsmError String (Maybe S.MIXALStmt)
               | UnresolvedLocalForward Int (Maybe S.MIXALStmt)
+              | UnresolvedSymbol S.Symbol (Maybe S.MIXALStmt)
 
 type M a = ErrorT AsmError (State AssemblerState) a
 
@@ -178,8 +179,10 @@ assembleStage2 st = result
 
           processIntermediate (pc, (Ready w), stmt) = return (pc, w, stmt)
           processIntermediate (pc, (Unresolved (S.RefNormal s) mk), stmt) =
-              let Just loc = lookup (S.DefNormal s) $ equivalents st
-              in return (pc, mk loc, stmt)
+              let loc = lookup (S.DefNormal s) $ equivalents st
+              in case loc of
+                   Nothing -> Left (UnresolvedSymbol s $ Just stmt)
+                   Just v -> return (pc, mk v, stmt)
           processIntermediate (pc, (Unresolved (S.RefForward i) mk), stmt) =
               let locs = localSymbols st ! i
                   possible = [a | a <- locs, S.toInt a > pc]
@@ -269,7 +272,7 @@ resolveSymbol (S.RefNormal s) = do
   st <- get
   let result = lookup (S.DefNormal s) $ equivalents st
   case result of
-    Nothing -> err $ "No such symbol " ++ show s
+    Nothing -> throwError . (UnresolvedSymbol s) =<< (Just <$> curStmt)
     Just v -> return v
 resolveSymbol (S.RefBackward i) = do
   pc <- getPc
@@ -404,6 +407,8 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
                 -- Re-throw ordinary errors; we are looking for an
                 -- unresolved local symbol error so we can defer it
                 resolveLater e@(AsmError _ _) = throwError e
+                resolveLater (UnresolvedSymbol sym _) =
+                    append (Unresolved (S.RefNormal sym) finish) s pc
                 resolveLater (UnresolvedLocalForward num _) =
                     append (Unresolved (S.RefForward num) finish) s pc
 
