@@ -1,11 +1,12 @@
 module Main where
 
-import System.Environment (getArgs)
+import System.Environment
 import Text.PrettyPrint.HughesPJ
 
 import System.MIX.MIXALParser
-import System.MIX.PP
 import System.MIX.Assembler
+import System.MIX.Assembler.PP
+import System.MIX.PP (ppMIXALStmt)
 
 formatMessage :: AsmError -> String
 formatMessage (AsmError s Nothing) = s
@@ -15,8 +16,9 @@ formatMessage (AsmError s (Just stmt)) =
 main :: IO ()
 main = do
   args <- getArgs
+  pName <- getProgName
   if length args /= 1 then
-      error "Usage: mixal <filename>" else
+      error $ "Usage: " ++ pName ++ " <filename>" else
       return ()
 
   let [fname] = args

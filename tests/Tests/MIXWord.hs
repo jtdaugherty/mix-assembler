@@ -11,8 +11,8 @@ import Test.Framework.Providers.QuickCheck2
 import Test.Framework
     ( testGroup, Test )
 
-import System.MIX.MIXWord
-import System.MIX.PP
+import System.MIX.Assembler.MIXWord
+import System.MIX.Assembler.PP
 
 tests :: Test
 tests = testGroup "MIXWord tests" [

@@ -12,9 +12,10 @@ import Control.Monad.State
 import Control.Monad.Error
 import Data.Maybe
 import Data.Bits (shiftL)
+
 import qualified System.MIX.Symbolic as S
-import qualified System.MIX.MIXWord as S
-import System.MIX.Char (charToByte)
+import qualified System.MIX.Assembler.MIXWord as S
+import System.MIX.Assembler.Char (charToByte)
 import System.MIX.OpCode
 
 data LogMessage = Msg String (Maybe S.MIXALStmt)

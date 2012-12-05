@@ -1,15 +1,13 @@
-module System.MIX.Char
+module System.MIX.Assembler.Char
     ( charToByte
-    , mixChars
     )
 where
 
 import Data.List (elemIndex)
+import System.MIX.Char (mixChars)
 import System.MIX.Symbolic (MIXChar(..))
-import System.MIX.MIXWord (MIXWord, toWord)
 
-mixChars :: [Char]
-mixChars = " ABCDEFGHIΔJKLMNOPQRΣΠSTUVWXYZ0123456789.,()+-*/=$<>@;:'"
+import System.MIX.Assembler.MIXWord (MIXWord, toWord)
 
 charToByte :: MIXChar -> MIXWord
 charToByte (MIXChar c) =

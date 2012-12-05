@@ -1,6 +1,8 @@
-Name:                mix-assembly
+Name:                mix-assembler
 Version:             0.1
-Synopsis:            Haskell implementation of the MIX assembly language
+Synopsis:            Assembler for the MIXAL language of the MIX
+                     machine in Donald Knuth's The Art of Computer
+                     Programming.
 License:             BSD3
 License-file:        LICENSE
 Author:              Jonathan Daugherty <jtd@galois.com>
@@ -15,21 +17,19 @@ Library
   GHC-Options:       -Wall
 
   Exposed-modules:
-    System.MIX.Symbolic
-    System.MIX.MIXALParser
-    System.MIX.PP
     System.MIX.Assembler
-    System.MIX.Char
-    System.MIX.OpCode
-    System.MIX.MIXWord
+    System.MIX.Assembler.PP
+    System.MIX.Assembler.Char
+    System.MIX.Assembler.MIXWord
 
   Build-depends:
     base >= 4,
     parsec,
     mtl,
-    pretty
+    pretty,
+    language-mixal
 
-Executable mixal
+Executable mix-as
   Hs-Source-Dirs:    src
   Main-is:           Main.hs
   GHC-Options:       -Wall
@@ -37,9 +37,11 @@ Executable mixal
     base,
     parsec,
     mtl,
-    pretty
+    pretty,
+    mix-assembler,
+    language-mixal
 
-Executable mixal-tests
+Executable mix-as-tests
   Hs-Source-Dirs:    tests
   Main-is:           TestDriver.hs
   GHC-Options:       -Wall
@@ -55,4 +57,5 @@ Executable mixal-tests
     test-framework,
     test-framework-quickcheck2,
     QuickCheck,
-    mix-assembly
+    mix-assembler,
+    language-mixal
