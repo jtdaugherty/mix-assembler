@@ -27,6 +27,7 @@ Library
     parsec,
     mtl,
     pretty,
+    array,
     language-mixal
 
 Executable mix-as
@@ -38,6 +39,7 @@ Executable mix-as
     parsec,
     mtl,
     pretty,
+    array,
     mix-assembler,
     language-mixal
 

@@ -12,6 +12,7 @@ import Control.Monad.State
 import Control.Monad.Error
 import Data.Maybe
 import Data.Bits (shiftL)
+import Data.Array
 
 import Language.MIXAL.OpCode
 import qualified Language.MIXAL.AST as S
@@ -22,12 +23,15 @@ data LogMessage = Msg String (Maybe S.MIXALStmt)
                   deriving (Show)
 
 data Intermediate = Ready S.MIXWord
-                  | Unresolved S.Symbol (S.MIXWord -> S.MIXWord)
+                  | Unresolved S.SymbolRef (S.MIXWord -> S.MIXWord)
 
 data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, S.MIXWord)]
        -- ^Includes symbols defined with EQU as well as symbols
        -- associated with program counter values.
+       , localSymbols :: Array Int [S.MIXWord]
+       -- ^Includes only local symbols. Maps each 0-9 to a list of
+       -- program counters at which that symbol was defined.
        , programCounter :: S.MIXWord
        , output :: [(Int, Intermediate, S.MIXALStmt)]
        , startAddr :: Maybe S.MIXWord
@@ -53,6 +57,7 @@ instance Error AsmError where
     strMsg s = AsmError s Nothing
 
 data AsmError = AsmError String (Maybe S.MIXALStmt)
+              | UnresolvedLocalForward Int (Maybe S.MIXALStmt)
 
 type M a = ErrorT AsmError (State AssemblerState) a
 
@@ -75,6 +80,7 @@ initialState =
        , currentStatement = S.Orig Nothing $ S.WValue (S.AtExpr $ S.Num 0) Nothing []
        , litConstCounter = 0
        , litConsts = []
+       , localSymbols = array (0, 9) $ zip [0..9] $ replicate 10 []
        }
 
 nextLitConstSym :: M S.Symbol
@@ -109,7 +115,7 @@ appendLitConst sym wv =
            )
 
 assemble :: [S.MIXALStmt] -> Either AsmError AssemblerResult
-assemble ss = assembleStage1 ss >>= (return . assembleStage2)
+assemble ss = assembleStage1 ss >>= assembleStage2
 
 assembleStage1 :: [S.MIXALStmt] -> Either AsmError AssemblerState
 assembleStage1 ss =
@@ -159,23 +165,34 @@ assemblyMain ss = do
 -- addresses of those literal constant words in memory.  The assembly
 -- of those referencing instructions is finished by providing them
 -- with the needed memory locations of the literal constant
--- expressions they referenced.  The final result is always a complete
--- program; this step can never fail.
-assembleStage2 :: AssemblerState -> AssemblerResult
-assembleStage2 st =
-    AssemblerResult { messages = logMessages st
-                    , program = p
-                    }
+-- expressions they referenced.
+assembleStage2 :: AssemblerState -> Either AsmError AssemblerResult
+assembleStage2 st = result
         where
-          p = Program (segs2 st) (equivalents st) (fromJust $ startAddr st)
+          result = do
+            progSegments <- segs2 st
+            let p = Program progSegments (equivalents st) (fromJust $ startAddr st)
+            return $ AssemblerResult { messages = logMessages st
+                                     , program = p
+                                     }
 
-          processIntermediate (pc, (Ready w), stmt) = (pc, w, stmt)
-          processIntermediate (pc, (Unresolved s mk), stmt) =
+          processIntermediate (pc, (Ready w), stmt) = return (pc, w, stmt)
+          processIntermediate (pc, (Unresolved (S.RefNormal s) mk), stmt) =
               let Just loc = lookup (S.DefNormal s) $ equivalents st
-              in (pc, mk loc, stmt)
+              in return (pc, mk loc, stmt)
+          processIntermediate (pc, (Unresolved (S.RefForward i) mk), stmt) =
+              let locs = localSymbols st ! i
+                  possible = [a | a <- locs, S.toInt a > pc]
+              in if null possible
+                 then Left (AsmError "no forward reference possible" $ Just stmt)
+                 else return (pc, mk (head possible), stmt)
+          processIntermediate (_, (Unresolved ref _), _) =
+              error $ "Unexpected symbolic reference type in stage 2: " ++ show ref
 
-          segs = getSegments . (processIntermediate <$>) . output
-          segs2 s = extract <$> segs s
+          segs s = do
+            final <- mapM processIntermediate $ output s
+            return $ getSegments final
+          segs2 s = (extract <$>) <$> segs s
           f (_, w, s) = (w, s)
           extract [] = undefined
           extract allss@((pc, _, _):_) = (pc, f <$> allss)
@@ -215,10 +232,20 @@ doAssembly (s:ss) = do
 
 registerSym :: Maybe S.DefinedSymbol -> S.MIXWord -> M ()
 registerSym Nothing _ = return ()
-registerSym (Just sym) w =
-  modify $ \s ->
-      s { equivalents = equivalents s ++ [(sym, w)]
-        }
+registerSym (Just (S.DefNormal sym)) w =
+    modify $ \s ->
+        s { equivalents = equivalents s ++ [(S.DefNormal sym, w)]
+          }
+registerSym (Just (S.DefLocal i)) w =
+    registerLocal i w
+
+registerLocal :: Int -> S.MIXWord -> M ()
+registerLocal num pc =
+  modify $ \st ->
+      let newLocals = localSymbols st // [(num, entry ++ [pc])]
+          entry = localSymbols st ! num
+      in st { localSymbols = newLocals
+            }
 
 evalExpr :: S.Expr -> M S.MIXWord
 evalExpr (S.AtExpr ae) = evalAtomicExpr ae
@@ -244,12 +271,28 @@ resolveSymbol (S.RefNormal s) = do
   case result of
     Nothing -> err $ "No such symbol " ++ show s
     Just v -> return v
-resolveSymbol (S.RefBackward _) = undefined
-resolveSymbol (S.RefForward _) = undefined
+resolveSymbol (S.RefBackward i) = do
+  pc <- getPc
+  locals <- localSymbols <$> get
+  let addrs = locals ! i
+      before = filter (\a -> S.toInt a < S.toInt pc) addrs
+
+  if null before then
+      err ("No such local symbol " ++ show i ++ " defined previously") else
+      return $ last before
+resolveSymbol (S.RefForward i) = do
+  pc <- getPc
+  locals <- localSymbols <$> get
+  let addrs = locals ! i
+      after = filter (\a -> S.toInt a > S.toInt pc) addrs
+
+  if null after then
+      (throwError . UnresolvedLocalForward i) =<< (Just <$> curStmt) else
+      return $ head after
 
 evalAtomicExpr :: S.AtomicExpr -> M S.MIXWord
 evalAtomicExpr (S.Num i) = return $ S.toWord i
-evalAtomicExpr (S.Sym s) = resolveSymbol s
+evalAtomicExpr (S.Sym s) = resolveSymbol $ S.RefNormal s
 evalAtomicExpr S.Asterisk = programCounter <$> get
 
 evalBinOp :: S.BinOp -> S.MIXWord -> S.MIXWord -> S.MIXWord
@@ -347,15 +390,24 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
     Just (S.LitConst e) -> do
             sym <- nextLitConstSym
             let s' = S.Inst ms op (Just $ S.AddrRef $ S.RefNormal sym) mi mf
-            append (Unresolved sym finish) s' pc
+            append (Unresolved (S.RefNormal sym) finish) s' pc
             appendLitConst sym e
     Nothing -> append (Ready $ finish $ S.toWord 0) s pc
     Just (S.AddrRef (S.RefNormal ref)) -> do
-            append (Unresolved ref finish) s pc
+            append (Unresolved (S.RefNormal ref) finish) s pc
             appendLitConst ref $ S.WValue (S.AtExpr $ S.Num 0) Nothing []
     Just addr -> do
-            v <- evalAddress addr
-            append (Ready $ finish v) s pc
+            let tryAddress = do
+                   v <- evalAddress addr
+                   append (Ready $ finish v) s pc
+
+                -- Re-throw ordinary errors; we are looking for an
+                -- unresolved local symbol error so we can defer it
+                resolveLater e@(AsmError _ _) = throwError e
+                resolveLater (UnresolvedLocalForward num _) =
+                    append (Unresolved (S.RefForward num) finish) s pc
+
+            tryAddress `catchError` resolveLater
   incPc
 assembleStatement (S.End ms wv) = do
   registerSym ms =<< getPc

@@ -9,6 +9,10 @@ import MIX.Assembler
 import MIX.Assembler.PP
 
 formatMessage :: AsmError -> String
+formatMessage (UnresolvedLocalForward i Nothing) =
+    "Unresolved forward reference for " ++ show i
+formatMessage (UnresolvedLocalForward i (Just s)) =
+    "Unresolved forward reference for " ++ show i ++ "\n  " ++ (render $ ppMIXALStmt s)
 formatMessage (AsmError s Nothing) = s
 formatMessage (AsmError s (Just stmt)) =
     s ++ "\nLast processed statement:\n  " ++ (render $ ppMIXALStmt stmt)
