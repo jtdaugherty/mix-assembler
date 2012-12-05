@@ -3,10 +3,10 @@ module Main where
 import System.Environment
 import Text.PrettyPrint.HughesPJ
 
-import System.MIX.MIXALParser
+import Language.MIXAL.Parser
+import Language.MIXAL.PP (ppMIXALStmt)
 import System.MIX.Assembler
 import System.MIX.Assembler.PP
-import System.MIX.PP (ppMIXALStmt)
 
 formatMessage :: AsmError -> String
 formatMessage (AsmError s Nothing) = s

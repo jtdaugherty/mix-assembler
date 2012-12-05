@@ -10,8 +10,8 @@ import Text.PrettyPrint.HughesPJ
 import Data.Char (intToDigit)
 import Numeric (showIntAtBase)
 
-import System.MIX.Symbolic
-import System.MIX.PP
+import Language.MIXAL.AST
+import Language.MIXAL.PP
 import System.MIX.Assembler (Program(..))
 import System.MIX.Assembler.MIXWord
 

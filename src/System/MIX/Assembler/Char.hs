@@ -4,8 +4,8 @@ module System.MIX.Assembler.Char
 where
 
 import Data.List (elemIndex)
-import System.MIX.Char (mixChars)
-import System.MIX.Symbolic (MIXChar(..))
+import Language.MIXAL.Char (mixChars)
+import Language.MIXAL.AST (MIXChar(..))
 
 import System.MIX.Assembler.MIXWord (MIXWord, toWord)
 
