@@ -17,10 +17,10 @@ Library
   GHC-Options:       -Wall
 
   Exposed-modules:
-    System.MIX.Assembler
-    System.MIX.Assembler.PP
-    System.MIX.Assembler.Char
-    System.MIX.Assembler.MIXWord
+    MIX.Assembler
+    MIX.Assembler.PP
+    MIX.Assembler.Char
+    MIX.Assembler.MIXWord
 
   Build-depends:
     base >= 4,

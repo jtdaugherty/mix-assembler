@@ -1,4 +1,4 @@
-module System.MIX.Assembler.Char
+module MIX.Assembler.Char
     ( charToByte
     )
 where
@@ -7,7 +7,7 @@ import Data.List (elemIndex)
 import Language.MIXAL.Char (mixChars)
 import Language.MIXAL.AST (MIXChar(..))
 
-import System.MIX.Assembler.MIXWord (MIXWord, toWord)
+import MIX.Assembler.MIXWord (MIXWord, toWord)
 
 charToByte :: MIXChar -> MIXWord
 charToByte (MIXChar c) =

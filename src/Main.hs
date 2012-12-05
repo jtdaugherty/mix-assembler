@@ -5,8 +5,8 @@ import Text.PrettyPrint.HughesPJ
 
 import Language.MIXAL.Parser
 import Language.MIXAL.PP (ppMIXALStmt)
-import System.MIX.Assembler
-import System.MIX.Assembler.PP
+import MIX.Assembler
+import MIX.Assembler.PP
 
 formatMessage :: AsmError -> String
 formatMessage (AsmError s Nothing) = s

@@ -1,4 +1,4 @@
-module System.MIX.Assembler.PP
+module MIX.Assembler.PP
     ( ppBinaryWord
     , ppProgram
     )
@@ -12,8 +12,8 @@ import Numeric (showIntAtBase)
 
 import Language.MIXAL.AST
 import Language.MIXAL.PP
-import System.MIX.Assembler (Program(..))
-import System.MIX.Assembler.MIXWord
+import MIX.Assembler (Program(..))
+import MIX.Assembler.MIXWord
 
 ppBinaryWord :: MIXWord -> String
 ppBinaryWord v =

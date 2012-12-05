@@ -1,4 +1,4 @@
-module System.MIX.Assembler.MIXWord
+module MIX.Assembler.MIXWord
     ( MIXWord
     , wordMask
     , getByte

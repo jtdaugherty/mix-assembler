@@ -1,4 +1,4 @@
-module System.MIX.Assembler
+module MIX.Assembler
     ( LogMessage(..)
     , Program(segments, symbols, startAddress)
     , AssemblerResult(messages, program)
@@ -15,8 +15,8 @@ import Data.Bits (shiftL)
 
 import Language.MIXAL.OpCode
 import qualified Language.MIXAL.AST as S
-import qualified System.MIX.Assembler.MIXWord as S
-import System.MIX.Assembler.Char (charToByte)
+import qualified MIX.Assembler.MIXWord as S
+import MIX.Assembler.Char (charToByte)
 
 data LogMessage = Msg String (Maybe S.MIXALStmt)
                   deriving (Show)
