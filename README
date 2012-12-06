@@ -3,12 +3,13 @@ MIXAL Assembler
 
 This package provides an incomplete implementation of an assembler for
 the MIXAL assembly language.  See the `language-mixal` package for the
-parser for a MIXAL parser used by this assembler.
+parser for a MIXAL parser used by this assembler.  The assembler saves
+binaries in its own format for later use by a disassembler and an
+emulator.
 
 To try it:
 
     $ cabal-dev install .../language-mixal .
     $ cabal-dev/bin/mix-as test.mixal
 
-The above will parse and pretty-print an assembled version of the
-specified MIXAL program.
+Check out `--help` for assembler options.
