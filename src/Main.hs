@@ -25,22 +25,25 @@ main :: IO ()
 main = do
   args <- getArgs
   pName <- getProgName
-  if length args /= 1 then
-      error $ "Usage: " ++ pName ++ " <filename>" else
+  if length args < 1 || length args > 2 then
+      error $ "Usage: " ++ pName ++ " <filename> [-d]" else
       return ()
 
-  let [fname] = args
+  let fname = args !! 0
+      debug = length args == 2 && args !! 1 == "-d"
+      opts = Options { preserveDebugData = debug
+                     }
 
   s <- readFile fname
   let r = parseMIXAL fname s
   case r of
     Left e -> putStrLn $ "Error: " ++ show e
     Right is ->
-        case assemble is of
+        case assemble opts is of
           Left e -> do
             putStrLn "Error during assembly:"
             putStrLn $ formatMessage e
           Right res -> do
             putStrLn "Assembler output:"
             putStrLn ""
-            putStrLn $ render $ ppProgram $ program res
+            putStrLn $ render $ ppProgram $ (program res)

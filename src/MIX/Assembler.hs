@@ -1,8 +1,10 @@
 module MIX.Assembler
     ( LogMessage(..)
-    , Program(segments, symbols, startAddress)
+    , Program(..)
+    , DebugData(..)
     , AssemblerResult(messages, program)
     , AsmError(..)
+    , Options(..)
     , assemble
     )
 where
@@ -42,15 +44,24 @@ data AssemblerState =
        }
 
 data Program =
-    Program { segments :: [(Int, [(S.MIXWord, S.MIXALStmt)])]
-            , symbols :: [(S.DefinedSymbol, S.MIXWord)]
+    Program { segments :: [(Int, [S.MIXWord])]
             , startAddress :: S.MIXWord
+            , debugData :: Maybe DebugData
             }
+
+data DebugData =
+    DebugData { segmentStatements :: [(Int, [S.MIXALStmt])]
+              , symbols :: [(S.DefinedSymbol, S.MIXWord)]
+              }
 
 data AssemblerResult =
     AssemblerResult { messages :: [LogMessage]
                     , program :: Program
                     }
+
+data Options =
+    Options { preserveDebugData :: Bool
+            }
 
 instance Error AsmError where
     noMsg = AsmError "<empty>" Nothing
@@ -115,11 +126,11 @@ appendLitConst sym wv =
                     }
            )
 
-assemble :: [S.MIXALStmt] -> Either AsmError AssemblerResult
-assemble ss = assembleStage1 ss >>= assembleStage2
+assemble :: Options -> [S.MIXALStmt] -> Either AsmError AssemblerResult
+assemble opts ss = assembleStage1 opts ss >>= assembleStage2 opts
 
-assembleStage1 :: [S.MIXALStmt] -> Either AsmError AssemblerState
-assembleStage1 ss =
+assembleStage1 :: Options -> [S.MIXALStmt] -> Either AsmError AssemblerState
+assembleStage1 _ ss =
     case status of
       Left e -> Left e
       Right _ -> Right st
@@ -167,15 +178,27 @@ assemblyMain ss = do
 -- of those referencing instructions is finished by providing them
 -- with the needed memory locations of the literal constant
 -- expressions they referenced.
-assembleStage2 :: AssemblerState -> Either AsmError AssemblerResult
-assembleStage2 st = result
+assembleStage2 :: Options -> AssemblerState -> Either AsmError AssemblerResult
+assembleStage2 opts st = result
         where
           result = do
             progSegments <- segs2 st
-            let p = Program progSegments (equivalents st) (fromJust $ startAddr st)
+            let p = Program (wordsOnly <$> progSegments) (fromJust $ startAddr st)
+                    (dbg progSegments)
             return $ AssemblerResult { messages = logMessages st
                                      , program = p
                                      }
+
+          dbg s = if preserveDebugData opts
+                  then Just $ debug s
+                  else Nothing
+
+          debug ss = DebugData { symbols = equivalents st
+                               , segmentStatements = debugSeg <$> ss
+                               }
+
+          debugSeg (pos, is) = (pos, snd <$> is)
+          wordsOnly (pos, is) = (pos, fst <$> is)
 
           processIntermediate (pc, (Ready w), stmt) = return (pc, w, stmt)
           processIntermediate (pc, (Unresolved (S.RefNormal s) mk), stmt) =
