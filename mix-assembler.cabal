@@ -21,6 +21,7 @@ Library
     MIX.Assembler.PP
     MIX.Assembler.Char
     MIX.Assembler.MIXWord
+    MIX.Assembler.IO
 
   Build-depends:
     base >= 4,
@@ -28,6 +29,8 @@ Library
     mtl,
     pretty,
     array,
+    cereal,
+    bytestring,
     language-mixal
 
 Executable mix-as
@@ -40,6 +43,9 @@ Executable mix-as
     mtl,
     pretty,
     array,
+    filepath,
+    bytestring,
+    cereal,
     mix-assembler,
     language-mixal
 
