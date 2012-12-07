@@ -349,9 +349,7 @@ evalWValue (S.WValue e mf es) = do
             Just (S.FieldExpr fe) ->
                 do
                   v <- evalExpr fe
-                  let r = (S.toInt v) `mod` 8
-                      l = (S.toInt v) `div` 8
-                  return (l, r)
+                  return (S.toInt v `divMod` 8)
 
   pairs <- forM ((e,mf):es) $ \(ex, fld) ->
            do
