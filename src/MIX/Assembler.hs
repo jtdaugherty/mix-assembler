@@ -335,8 +335,8 @@ evalAddress (S.AddrExpr e) = evalExpr e
 evalAddress (S.AddrRef ref) = resolveSymbol ref
 evalAddress (S.AddrLiteral l) = evalWValue l
 
-fieldToWord :: S.Field -> M S.MIXWord
-fieldToWord (S.FieldExpr e) = evalExpr e
+evalField :: S.Field -> M S.MIXWord
+evalField (S.FieldExpr e) = evalExpr e
 
 evalWValue :: S.WValue -> M S.MIXWord
 evalWValue (S.WValue e mf es) = do
@@ -350,17 +350,13 @@ evalWValue (S.WValue e mf es) = do
                       l = (S.toInt v) `div` 8
                   return (l, r)
 
-  -- Store the leftmost wvalue.
-  val <- evalExpr e
-  f <- toFieldPair mf
+  pairs <- forM ((e,mf):es) $ \(ex, fld) ->
+           do
+             v <- evalExpr ex
+             fv <- toFieldPair fld
+             return (v, fv)
 
-  let initial = S.storeInField val f $ S.toWord 0
-      next dest (ex, fld) = do
-        v <- evalExpr ex
-        fv <- toFieldPair fld
-        return $ S.storeInField v fv dest
-
-  foldM next initial es
+  return $ S.storeManyInField pairs (S.toWord 0)
 
 assembleStatement :: S.MIXALStmt -> M ()
 assembleStatement (S.Orig ms wv) = do
@@ -369,30 +365,49 @@ assembleStatement (S.Orig ms wv) = do
   when (S.toInt v < 0) $
        err ("Invalid ORIG instruction with negative argument " ++ (show v))
   setPc v
+
 assembleStatement (S.Equ ms wv) = do
   val <- evalWValue wv
   registerSym ms val
+
 assembleStatement s@(S.Con ms wv) = do
   w <- evalWValue wv
   pc <- getPc
   registerSym ms pc
   append (Ready w) s pc
   incPc
+
 assembleStatement s@(S.Alf ms (c1, c2, c3, c4, c5)) = do
-  let val = S.storeInField (charToByte c1) (1, 1) $
-            S.storeInField (charToByte c2) (2, 2) $
-            S.storeInField (charToByte c3) (3, 3) $
-            S.storeInField (charToByte c4) (4, 4) $
-            S.storeInField (charToByte c5) (5, 5) (S.toWord 0)
+  let val = S.storeManyInField [ (charToByte c1, (1, 1))
+                               , (charToByte c2, (2, 2))
+                               , (charToByte c3, (3, 3))
+                               , (charToByte c4, (4, 4))
+                               , (charToByte c5, (5, 5))
+                               ] (S.toWord 0)
+
   registerSym ms =<< getPc
   append (Ready val) s =<< getPc
   incPc
+
+assembleStatement (S.End ms wv) = do
+  registerSym ms =<< getPc
+  a <- startAddr <$> get
+  v <- evalWValue wv
+  case a of
+    Just x -> err ("Start address already declared to be " ++ show x)
+    Nothing -> do
+           let mx = (1 `shiftL` (2 * S.bitsPerByte)) - 1
+           when (S.toInt v > mx) $
+                err $ "END argument exceeds two-byte maximum (max value " ++ show mx ++ ")"
+           modify $ \st -> st { startAddr = Just v }
+
 assembleStatement s@(S.Inst ms op ma mi mf) = do
   pc <- getPc
   registerSym ms pc
   f <- case mf of
-         Nothing -> return $ S.toWord 5 -- (0:5) = 0*8 + 5
-         Just fld -> fieldToWord fld
+         -- (0:5) = 0*8 + 5
+         Nothing -> return $ S.toWord 5
+         Just fld -> evalField fld
 
   i <- case mi of
          Nothing -> return $ S.toWord 0
@@ -407,10 +422,11 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
            else f
 
       finish a =
-          S.storeInField a (0, 2) $
-           S.storeInField i (3, 3) $
-           S.storeInField f' (4, 4) $
-           S.storeInField (S.toWord opc) (5, 5) (S.toWord 0)
+          S.storeManyInField [ (a, (0, 2))
+                             , (i, (3, 3))
+                             , (f', (4, 4))
+                             , (S.toWord opc, (5, 5))
+                             ] (S.toWord 0)
 
   case ma of
     Just (S.LitConst e) -> do
@@ -437,14 +453,3 @@ assembleStatement s@(S.Inst ms op ma mi mf) = do
 
             tryAddress `catchError` resolveLater
   incPc
-assembleStatement (S.End ms wv) = do
-  registerSym ms =<< getPc
-  a <- startAddr <$> get
-  v <- evalWValue wv
-  case a of
-    Just x -> err ("Start address already declared to be " ++ show x)
-    Nothing -> do
-           let mx = (1 `shiftL` (2 * S.bitsPerByte)) - 1
-           when (S.toInt v > mx) $
-                err $ "END argument exceeds two-byte maximum (max value " ++ show mx ++ ")"
-           modify $ \st -> st { startAddr = Just v }

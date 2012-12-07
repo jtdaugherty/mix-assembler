@@ -21,6 +21,7 @@ tests = testGroup "MIXWord tests" [
                        , testTruncate
                        , testStorage
                        , testStorageUntouched
+                       , testMultipleStorage
                        ]
         , testGroup "Byte clearing" [
                          testClearByte
@@ -29,6 +30,15 @@ tests = testGroup "MIXWord tests" [
 
 maxbits :: Int
 maxbits = bitsPerByte * bytesPerWord
+
+storePair :: Gen (MIXWord, (Int, Int))
+storePair = (,) <$> (toWord <$> mixInt) <*> arbitraryField
+
+arbitraryField :: Gen (Int, Int)
+arbitraryField = do
+  l <- choose (0, 5)
+  r <- choose (l, 5)
+  return (l, r)
 
 mixInt :: Gen Int
 mixInt = choose (minVal, maxVal)
@@ -82,6 +92,19 @@ testStorage =
               and [ if lft == 0 then chkInField (0, 0) else True
                   , and (chkInField <$> fieldPairs)
                   ]
+
+testMultipleStorage :: Test
+testMultipleStorage =
+    let desc = "Multiple stores in one call occur from left to right"
+    in testProperty desc $
+       forAll (toWord <$> mixInt) $ \dest ->
+       forAll (listOf storePair) $ \pairs ->
+           let expected = if null pairs
+                          then dest
+                          else storeInField lastWord lastField prev
+               (lastWord, lastField) = last pairs
+               prev = storeManyInField (init pairs) dest
+           in storeManyInField pairs dest == expected
 
 testStorageUntouched :: Test
 testStorageUntouched =

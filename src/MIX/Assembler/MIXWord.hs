@@ -3,6 +3,7 @@ module MIX.Assembler.MIXWord
     , wordMask
     , getByte
     , storeInField
+    , storeManyInField
     , toWord
     , toInt
     , setNegative
@@ -86,6 +87,10 @@ bitsPerByte = 6
 
 bytesPerWord :: Int
 bytesPerWord = 5
+
+storeManyInField :: [(MIXWord, (Int, Int))] -> MIXWord -> MIXWord
+storeManyInField many base =
+    foldl (flip $ uncurry $ storeInField) base many
 
 storeInField :: MIXWord -> (Int, Int) -> MIXWord -> MIXWord
 storeInField (MW sv) (left, right) (MW d) =
