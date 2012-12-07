@@ -200,28 +200,31 @@ assembleStage2 opts st = result
           debugSeg (pos, is) = (pos, snd <$> is)
           wordsOnly (pos, is) = (pos, fst <$> is)
 
-          processIntermediate (pc, (Ready w), stmt) = return (pc, w, stmt)
-          processIntermediate (pc, (Unresolved (S.RefNormal s) mk), stmt) =
-              let loc = lookup (S.DefNormal s) $ equivalents st
-              in case loc of
-                   Nothing -> Left (UnresolvedSymbol s $ Just stmt)
-                   Just v -> return (pc, mk v, stmt)
-          processIntermediate (pc, (Unresolved (S.RefForward i) mk), stmt) =
-              let locs = localSymbols st ! i
-                  possible = [a | a <- locs, S.toInt a > pc]
-              in if null possible
-                 then Left (AsmError "no forward reference possible" $ Just stmt)
-                 else return (pc, mk (head possible), stmt)
-          processIntermediate (_, (Unresolved ref _), _) =
-              error $ "Unexpected symbolic reference type in stage 2: " ++ show ref
-
           segs s = do
-            final <- mapM processIntermediate $ output s
+            final <- mapM (processIntermediate st) $ output s
             return $ getSegments final
           segs2 s = (extract <$>) <$> segs s
           f (_, w, s) = (w, s)
           extract [] = undefined
           extract allss@((pc, _, _):_) = (pc, f <$> allss)
+
+processIntermediate :: AssemblerState
+                    -> (Int, Intermediate, S.MIXALStmt)
+                    -> Either AsmError (Int, S.MIXWord, S.MIXALStmt)
+processIntermediate _ (pc, (Ready w), stmt) = return (pc, w, stmt)
+processIntermediate st (pc, (Unresolved (S.RefNormal s) mk), stmt) =
+    let loc = lookup (S.DefNormal s) $ equivalents st
+    in case loc of
+         Nothing -> Left (UnresolvedSymbol s $ Just stmt)
+         Just v -> return (pc, mk v, stmt)
+processIntermediate st (pc, (Unresolved (S.RefForward i) mk), stmt) =
+    let locs = localSymbols st ! i
+        possible = [a | a <- locs, S.toInt a > pc]
+    in if null possible
+       then Left (AsmError "no forward reference possible" $ Just stmt)
+       else return (pc, mk (head possible), stmt)
+processIntermediate _ (_, (Unresolved ref _), _) =
+    error $ "Unexpected symbolic reference type in stage 2: " ++ show ref
 
 getSegments :: [(Int, a, b)] -> [[(Int, a, b)]]
 getSegments [] = []
