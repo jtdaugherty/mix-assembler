@@ -5,7 +5,7 @@ module MIX.Assembler.MIXWord
     , storeInField
     , storeManyInField
     , toWord
-    , toInt
+    , wordToInteger
     , setNegative
     , clearNegative
     , clearByte
@@ -21,11 +21,12 @@ module MIX.Assembler.MIXWord
     )
 where
 
+import Control.Applicative ((<$>))
 import Data.Bits
 import Data.List (intersperse)
 import Numeric (showHex)
 
-newtype MIXWord = MW Int
+newtype MIXWord = MW Integer
     deriving (Eq)
 
 instance Show MIXWord where
@@ -39,23 +40,23 @@ instance Show MIXWord where
                   , showByte (getByte 5 w)
                   ]
 
-showByte :: Int -> String
+showByte :: Integer -> String
 showByte b = pad ++ h
     where
       h = showHex b ""
       pad = if length h == 1 then "0" else ""
 
-wordMask :: Int
+wordMask :: Integer
 wordMask = 2 ^ (bitsPerByte * bytesPerWord) - 1
 
-toWord :: Int -> MIXWord
+toWord :: Integer -> MIXWord
 toWord i =
     MW $ if i < 0
          then (abs i .&. wordMask) .|. signBit
          else abs i .&. wordMask
 
-toInt :: MIXWord -> Int
-toInt (MW v) =
+wordToInteger :: MIXWord -> Integer
+wordToInteger (MW v) =
     let sgn = if v .&. signBit == signBit
               then (-1)
               else 1
@@ -70,34 +71,34 @@ setNegative (MW v) = MW $ v .|. signBit
 clearNegative :: MIXWord -> MIXWord
 clearNegative (MW v) = MW $ v .&. (complement signBit)
 
-signBit :: Int
-signBit = 0x1 `shiftL` (bitsPerByte * bytesPerWord)
+signBit :: Integer
+signBit = 0x1 `shiftL` (fromEnum $ bitsPerByte * bytesPerWord)
 
-byteMask :: Int
+byteMask :: Integer
 byteMask = 0x3F -- 111111
 
-getByte :: Int -> MIXWord -> Int
+getByte :: Integer -> MIXWord -> Integer
 getByte num (MW i) =
     -- Right-shift the byte of interest down to the first 6 bits and
     -- then mask it
-    shiftR i ((bytesPerWord - num) * bitsPerByte) .&. byteMask
+    shiftR i (fromEnum $ (bytesPerWord - num) * bitsPerByte) .&. byteMask
 
-bitsPerByte :: Int
+bitsPerByte :: Integer
 bitsPerByte = 6
 
-bytesPerWord :: Int
+bytesPerWord :: Integer
 bytesPerWord = 5
 
-storeManyInField :: [(MIXWord, (Int, Int))] -> MIXWord -> MIXWord
+storeManyInField :: [(MIXWord, (Integer, Integer))] -> MIXWord -> MIXWord
 storeManyInField many base =
     foldl (flip $ uncurry $ storeInField) base many
 
-storeInField :: MIXWord -> (Int, Int) -> MIXWord -> MIXWord
+storeInField :: MIXWord -> (Integer, Integer) -> MIXWord -> MIXWord
 storeInField (MW sv) (left, right) (MW d) =
     let shiftAmt = (bytesPerWord - right) * bitsPerByte
         totalBits = (right - left + 1) * bitsPerByte
-        keepBits = (1 `shiftL` totalBits) - 1
-        sval = (sv .&. keepBits) `shiftL` shiftAmt
+        keepBits = (1 `shiftL` (fromEnum totalBits)) - 1
+        sval = (sv .&. keepBits) `shiftL` (fromEnum shiftAmt)
         left' = max 1 left
         final = sval .|. (clearBytes [left'..right] d)
         sgn = if left == 0
@@ -106,7 +107,7 @@ storeInField (MW sv) (left, right) (MW d) =
         finalWithSign = sgn .|. clearByte 0 final
     in MW finalWithSign
 
-clearBytes :: (Bits a) => [Int] -> a -> a
+clearBytes :: (Bits a) => [Integer] -> a -> a
 clearBytes [] = id
 clearBytes (i:is) = clearByte i . clearBytes is
 
@@ -116,19 +117,19 @@ clearBytes (i:is) = clearByte i . clearBytes is
 -- byte 3: bits 12-17
 -- byte 4: bits 6-11
 -- byte 5: bits 0-5
-clearByte :: (Bits a) => Int -> a -> a
+clearByte :: (Bits a) => Integer -> a -> a
 clearByte i val =
     let base = (bytesPerWord - i) * bitsPerByte
-    in foldr (flip clearBit) val [base..base+bitsPerByte-1]
+    in foldr (flip clearBit) val (fromEnum <$> [base..base+bitsPerByte-1])
 
 addWord :: MIXWord -> MIXWord -> MIXWord
-addWord a b = toWord $ toInt a + toInt b
+addWord a b = toWord $ wordToInteger a + wordToInteger b
 
 subWord :: MIXWord -> MIXWord -> MIXWord
-subWord a b = toWord $ toInt a - toInt b
+subWord a b = toWord $ wordToInteger a - wordToInteger b
 
 divWord :: MIXWord -> MIXWord -> MIXWord
-divWord a b = toWord $ div (toInt a) (toInt b)
+divWord a b = toWord $ div (wordToInteger a) (wordToInteger b)
 
 multWord :: MIXWord -> MIXWord -> MIXWord
-multWord a b = toWord $ (toInt a) * (toInt b)
+multWord a b = toWord $ (wordToInteger a) * (wordToInteger b)

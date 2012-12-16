@@ -32,7 +32,7 @@ getI = get
 
 instance Serialize MIXWord where
     get = toWord <$> get
-    put = put . toInt
+    put = put . wordToInteger
 
 instance Serialize Symbol where
     get = Symbol <$> get

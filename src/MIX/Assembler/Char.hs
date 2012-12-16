@@ -13,4 +13,4 @@ charToByte :: MIXChar -> MIXWord
 charToByte (MIXChar c) =
     case elemIndex c mixChars of
       Nothing -> error $ "Character not supported: " ++ [c]
-      Just i -> toWord i
+      Just i -> toWord $ toEnum i

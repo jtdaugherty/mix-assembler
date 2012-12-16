@@ -31,11 +31,11 @@ data AssemblerState =
     AS { equivalents :: [(S.DefinedSymbol, S.MIXWord)]
        -- ^Includes symbols defined with EQU as well as symbols
        -- associated with program counter values.
-       , localSymbols :: Array Int [S.MIXWord]
+       , localSymbols :: Array Integer [S.MIXWord]
        -- ^Includes only local symbols. Maps each 0-9 to a list of
        -- program counters at which that symbol was defined.
        , programCounter :: S.MIXWord
-       , output :: [(Int, Intermediate, S.MIXALStmt)]
+       , output :: [(Integer, Intermediate, S.MIXALStmt)]
        , startAddr :: Maybe S.MIXWord
        , logMessages :: [LogMessage]
        , currentStatement :: S.MIXALStmt
@@ -44,13 +44,13 @@ data AssemblerState =
        }
 
 data Program =
-    Program { segments :: [(Int, [S.MIXWord])]
+    Program { segments :: [(Integer, [S.MIXWord])]
             , startAddress :: S.MIXWord
             , debugData :: Maybe DebugData
             }
 
 data DebugData =
-    DebugData { segmentStatements :: [(Int, [S.MIXALStmt])]
+    DebugData { segmentStatements :: [(Integer, [S.MIXALStmt])]
               , symbols :: [(S.DefinedSymbol, S.MIXWord)]
               }
 
@@ -68,7 +68,7 @@ instance Error AsmError where
     strMsg s = AsmError s Nothing
 
 data AsmError = AsmError String (Maybe S.MIXALStmt)
-              | UnresolvedLocalForward Int (Maybe S.MIXALStmt)
+              | UnresolvedLocalForward Integer (Maybe S.MIXALStmt)
               | UnresolvedSymbol S.Symbol (Maybe S.MIXALStmt)
 
 type M a = ErrorT AsmError (State AssemblerState) a
@@ -116,7 +116,7 @@ setPc i =
 append :: Intermediate -> S.MIXALStmt -> S.MIXWord -> M ()
 append inst stmt pc =
     modify (\s -> s { output = output s ++
-                               [(S.toInt pc, inst, stmt)]
+                               [(S.wordToInteger pc, inst, stmt)]
                     }
            )
 
@@ -209,8 +209,8 @@ assembleStage2 opts st = result
           extract allss@((pc, _, _):_) = (pc, f <$> allss)
 
 processIntermediate :: AssemblerState
-                    -> (Int, Intermediate, S.MIXALStmt)
-                    -> Either AsmError (Int, S.MIXWord, S.MIXALStmt)
+                    -> (Integer, Intermediate, S.MIXALStmt)
+                    -> Either AsmError (Integer, S.MIXWord, S.MIXALStmt)
 processIntermediate _ (pc, (Ready w), stmt) = return (pc, w, stmt)
 processIntermediate st (pc, (Unresolved (S.RefNormal s) mk), stmt) =
     let loc = lookup (S.DefNormal s) $ equivalents st
@@ -219,14 +219,14 @@ processIntermediate st (pc, (Unresolved (S.RefNormal s) mk), stmt) =
          Just v -> return (pc, mk v, stmt)
 processIntermediate st (pc, (Unresolved (S.RefForward i) mk), stmt) =
     let locs = localSymbols st ! i
-        possible = [a | a <- locs, S.toInt a > pc]
+        possible = [a | a <- locs, S.wordToInteger a > pc]
     in if null possible
        then Left (AsmError "no forward reference possible" $ Just stmt)
        else return (pc, mk (head possible), stmt)
 processIntermediate _ (_, (Unresolved ref _), _) =
     error $ "Unexpected symbolic reference type in stage 2: " ++ show ref
 
-getSegments :: [(Int, a, b)] -> [[(Int, a, b)]]
+getSegments :: [(Integer, a, b)] -> [[(Integer, a, b)]]
 getSegments [] = []
 getSegments es = s : rest
     where
@@ -268,7 +268,7 @@ registerSym (Just (S.DefNormal sym)) w =
 registerSym (Just (S.DefLocal i)) w =
     registerLocal i w
 
-registerLocal :: Int -> S.MIXWord -> M ()
+registerLocal :: Integer -> S.MIXWord -> M ()
 registerLocal num pc =
   modify $ \st ->
       let newLocals = localSymbols st // [(num, entry ++ [pc])]
@@ -304,7 +304,7 @@ resolveSymbol (S.RefBackward i) = do
   pc <- getPc
   locals <- localSymbols <$> get
   let addrs = locals ! i
-      before = filter (\a -> S.toInt a < S.toInt pc) addrs
+      before = filter (\a -> S.wordToInteger a < S.wordToInteger pc) addrs
 
   if null before then
       err ("No such local symbol " ++ show i ++ " defined previously") else
@@ -313,7 +313,7 @@ resolveSymbol (S.RefForward i) = do
   pc <- getPc
   locals <- localSymbols <$> get
   let addrs = locals ! i
-      after = filter (\a -> S.toInt a > S.toInt pc) addrs
+      after = filter (\a -> S.wordToInteger a > S.wordToInteger pc) addrs
 
   if null after then
       (throwError . UnresolvedLocalForward i) =<< (Just <$> curStmt) else
@@ -349,7 +349,7 @@ evalWValue (S.WValue e mf es) = do
             Just (S.FieldExpr fe) ->
                 do
                   v <- evalExpr fe
-                  return (S.toInt v `divMod` 8)
+                  return (S.wordToInteger v `divMod` 8)
 
   pairs <- forM ((e,mf):es) $ \(ex, fld) ->
            do
@@ -363,7 +363,7 @@ assembleStatement :: S.MIXALStmt -> M ()
 assembleStatement (S.Orig ms wv) = do
   registerSym ms =<< getPc
   v <- evalWValue wv
-  when (S.toInt v < 0) $
+  when (S.wordToInteger v < 0) $
        err ("Invalid ORIG instruction with negative argument " ++ (show v))
   setPc v
 
@@ -397,8 +397,8 @@ assembleStatement (S.End ms wv) = do
   case a of
     Just x -> err ("Start address already declared to be " ++ show x)
     Nothing -> do
-           let mx = (1 `shiftL` (2 * S.bitsPerByte)) - 1
-           when (S.toInt v > mx) $
+           let mx = (1 `shiftL` (fromEnum $ 2 * S.bitsPerByte)) - 1
+           when (S.wordToInteger v > mx) $
                 err $ "END argument exceeds two-byte maximum (max value " ++ show mx ++ ")"
            modify $ \st -> st { startAddr = Just v }
 

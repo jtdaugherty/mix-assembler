@@ -27,7 +27,7 @@ ppBinaryWord v =
                       ]
         where
           showByte b = pad $ showIntAtBase 2 intToDigit b ""
-          pad s = replicate (bitsPerByte - length s) '0' ++ s
+          pad s = replicate (fromEnum (bitsPerByte - (toInteger $ length s))) '0' ++ s
 
           b1 = getByte 1 v
           b2 = getByte 2 v
@@ -40,10 +40,10 @@ ppSymEntry (sym, off) =
     ppSymbolDef sym $$
                 nest 14 (
                          text " = " <> (text $ show off) $$
-                         nest 20 (text " = " <> (int $ toInt off))
+                         nest 20 (text " = " <> (integer $ wordToInteger off))
                         )
 
-ppSegment :: (Int, [MIXWord]) -> Maybe [MIXALStmt] -> Doc
+ppSegment :: (Integer, [MIXWord]) -> Maybe [MIXALStmt] -> Doc
 ppSegment (start, mixwords) mStmts =
     hang (text "Segment:") 2 $ vcat (heading : entryLines)
         where
@@ -57,7 +57,7 @@ ppSegment (start, mixwords) mStmts =
                          else Nothing
 
           heading = ppLine (text "Addr") (text "MIX Word") (text "Raw") mixalHeading
-          ppEntry (pc, (w, stmt)) = ppLine (int pc) (text $ show w) (text $ ppBinaryWord w) (ppMIXALStmt <$> stmt)
+          ppEntry (pc, (w, stmt)) = ppLine (integer pc) (text $ show w) (text $ ppBinaryWord w) (ppMIXALStmt <$> stmt)
 
           ppLine c1 c2 c3 mc4 =
               let Just c4 = ((text "|" <+>) <$> mc4) <|> Just empty
@@ -71,7 +71,7 @@ ppEquivalents (Just debug) =
 
 ppProgram :: Program -> Doc
 ppProgram p =
-    let heading = text "Program start address:" <+> (int $ toInt $ startAddress p)
+    let heading = text "Program start address:" <+> (integer $ wordToInteger $ startAddress p)
         mDebug = debugData p
 
         segDocs = segDoc <$> segments p

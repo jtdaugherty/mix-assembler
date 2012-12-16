@@ -28,29 +28,29 @@ tests = testGroup "MIXWord tests" [
                         ]
         ]
 
-maxbits :: Int
+maxbits :: Integer
 maxbits = bitsPerByte * bytesPerWord
 
-storePair :: Gen (MIXWord, (Int, Int))
+storePair :: Gen (MIXWord, (Integer, Integer))
 storePair = (,) <$> (toWord <$> mixInt) <*> arbitraryField
 
-arbitraryField :: Gen (Int, Int)
+arbitraryField :: Gen (Integer, Integer)
 arbitraryField = do
   l <- choose (0, 5)
   r <- choose (l, 5)
   return (l, r)
 
-mixInt :: Gen Int
+mixInt :: Gen Integer
 mixInt = choose (minVal, maxVal)
     where
       (minVal, maxVal) = (-(2^maxbits)+1, 2^maxbits-1)
 
 testIntWordConversion :: Test
 testIntWordConversion =
-    let desc = "toWord/toInt are consistent"
+    let desc = "toWord/wordToInteger are consistent"
     in testProperty desc $ forAll mixInt $ \i ->
-        and [ (toInt $ toWord i) == i
-            , (toWord $ toInt $ toWord i) == toWord i
+        and [ (wordToInteger $ toWord i) == i
+            , (toWord $ wordToInteger $ toWord i) == toWord i
             ]
 
 testTruncate :: Test
@@ -59,8 +59,8 @@ testTruncate =
     in testProperty desc $
        forAll arbitrary $ \i ->
            if i >= 0
-           then (toInt $ toWord i) B..&. wordMask == (i B..&. wordMask)
-           else abs (toInt (toWord i)) B..&. wordMask == abs i B..&. wordMask
+           then (wordToInteger $ toWord i) B..&. wordMask == (i B..&. wordMask)
+           else abs (wordToInteger (toWord i)) B..&. wordMask == abs i B..&. wordMask
 
 testStorage :: Test
 testStorage =
@@ -135,13 +135,13 @@ testStorageUntouched =
 testClearByte :: Test
 testClearByte =
     let desc = "clearByte does the right thing"
-        mask = (1 `B.shiftL` bitsPerByte) - 1
+        mask = (1 `B.shiftL` (fromEnum bitsPerByte)) - 1
     in testProperty desc $
        forAll (choose (0, 5)) $ \i ->
            forAll mixInt $ \mi ->
                let tst = clearByte i mi == expected
                    expected = mi B..&. preserved
-                   preserved = B.complement $ mask `B.shiftL` ((bytesPerWord - i) * bitsPerByte)
+                   preserved = B.complement $ mask `B.shiftL` (fromEnum ((bytesPerWord - i) * bitsPerByte))
                    msg = concat [ "Index: " ++ show i ++ "\n"
                                 , "Original:\n  " ++ show (toWord mi) ++ "\n"
                                 , "  " ++ (ppBinaryWord $ toWord mi) ++ "\n"
