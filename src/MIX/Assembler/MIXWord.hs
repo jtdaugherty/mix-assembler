@@ -75,7 +75,7 @@ signBit :: Integer
 signBit = 0x1 `shiftL` (fromEnum $ bitsPerByte * bytesPerWord)
 
 byteMask :: Integer
-byteMask = 0x3F -- 111111
+byteMask = (1 `shiftL` (fromEnum bitsPerByte)) - 1
 
 getByte :: Integer -> MIXWord -> Integer
 getByte num (MW i) =
